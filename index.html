@@ -132,6 +132,19 @@ nav button.on{color:var(--c)}
 
 <!-- ============ TAB TẠO GIỌNG ============ -->
 <section class="tab" id="t-lab">
+ <div class="card" id="pccard"><h3>Thiết kế giọng trên PC</h3><div class="fb">
+  <div id="pcst" class="muted small"></div>
+  <label>Mô tả giọng (tiếng Anh)</label>
+  <textarea id="dins" style="min-height:120px"></textarea>
+  <label>Câu mẫu (nên dài 15–20 giây, giọng lưu lại sẽ bắt chước cách đọc câu này)</label>
+  <textarea id="dtxt" style="min-height:80px"></textarea>
+  <div class="row" style="margin-top:8px"><select id="dn" style="flex:0 0 120px"><option value="1">1 mẫu</option><option value="3">3 mẫu</option><option value="5">5 mẫu</option></select><button class="pri" id="dgo">🎙 Tạo mẫu giọng</button></div>
+  <div class="muted small" id="dinfo" style="margin-top:6px"></div>
+  <div class="list" id="dlist"></div>
+  <label style="margin-top:12px">Giọng đã lưu trên PC</label>
+  <div class="list" id="pclist"></div>
+ </div></div>
+
  <div class="card"><h3>Giọng của bạn</h3><div class="fb">
   <div class="list" id="mylist"></div>
  </div></div>
@@ -183,7 +196,17 @@ nav button.on{color:var(--c)}
 
 <!-- ============ TAB CÀI ĐẶT ============ -->
 <section class="tab" id="t-set">
- <div class="card"><h3>Mô hình đọc</h3><div class="fb">
+ <div class="card" id="pcset"><h3>Giọng trên PC</h3><div class="fb">
+  <div class="muted small">Dùng mô hình chạy trên máy tính (Qwen3-TTS hoặc VoxCPM2). Bấm đúp ChayQwen.bat hoặc ChayVoxCPM.bat trước, giữ cửa sổ mở.</div>
+  <label>Địa chỉ máy chủ</label>
+  <input id="pcurl" autocomplete="off" inputmode="url">
+  <div class="row" style="margin-top:8px"><button class="sm" data-pcu="8800">Qwen3 (8800)</button><button class="sm" data-pcu="8801">VoxCPM2 (8801)</button><button class="pri sm" id="pcchk">Kiểm tra kết nối</button></div>
+  <label>Mô tả cho đoạn [slow] (chỉ VoxCPM2 dùng được)</label>
+  <input id="pcslow" autocomplete="off">
+  <div id="pcinfo"></div>
+ </div></div>
+
+ <div class="card"><h3>Mô hình đọc (Kokoro trong trình duyệt)</h3><div class="fb">
   <div class="seg" id="dev"><button data-v="auto" class="on">Tự động</button><button data-v="webgpu">Nhanh (GPU)</button><button data-v="wasm">Tiết kiệm</button></div>
   <div class="muted small" id="devnote" style="margin-top:6px"></div>
   <div class="row" style="margin-top:8px"><button id="mload">⬇ Tải mô hình</button><button class="red" id="mclear">Xóa mô hình đã tải</button></div>
@@ -215,7 +238,9 @@ nav button.on{color:var(--c)}
   <p>Ghi <b>[slow]</b> ở đầu một đoạn để đọc chậm lại (mặc định 0,85 lần tốc độ chung, chỉnh trong thẻ Ngắt nghỉ) và nghỉ dài hơn. Ví dụ: <i>| [slow] Leonidas fell. The pass was lost. |</i></p>
   <h4>5. So sánh giọng</h4>
   <p>Tab Tạo giọng → So sánh nhiều giọng: tích các giọng muốn thử, chỉnh tốc độ riêng, bấm Chạy. Mỗi giọng có số đo nhanh: từ/phút, tỷ lệ im lặng, chỗ nghỉ dài nhất. Màu xanh là đạt mốc 155–170 từ/phút và nghỉ không quá 0,8 giây.</p>
-  <h4>6. Lưu ý</h4>
+  <h4>6. Giọng trên PC (tự nhiên hơn)</h4>
+  <p>Cài một lần bằng CaiDat.bat trong thư mục pc. Mỗi lần dùng: bấm đúp ChayQwen.bat, mở Fox-voice trên Chrome của chính máy đó → Cài đặt → Giọng trên PC → Kiểm tra kết nối. Tab Tạo giọng → Thiết kế giọng trên PC: tạo vài mẫu từ mô tả, nghe, Lưu mẫu ưng nhất. Giọng đã lưu dùng như giọng thường ở tab Đọc và trong So sánh.</p>
+  <h4>7. Lưu ý</h4>
   <ul><li>Chỉ đọc tiếng Anh (Mỹ và Anh).</li>
   <li>Mọi xử lý chạy trong máy, không gửi văn bản đi đâu.</li>
   <li>Trên iPhone, giữ màn hình sáng và để app mở khi đang tạo.</li>
@@ -236,7 +261,7 @@ nav button.on{color:var(--c)}
 
 <script>
 'use strict';
-const APP_VER='1.2 (10/11/2026)';
+const APP_VER='1.3 (10/11/2026)';
 const SR=24000;
 const MODEL_ID='onnx-community/Kokoro-82M-v1.0-ONNX';
 const KOKORO_URLS=['https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js','https://unpkg.com/kokoro-js@1.2.1/dist/kokoro.web.js'];
@@ -268,7 +293,7 @@ const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='M
 function loadJ(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v&&typeof v==='object'?v:d}catch(e){return d}}
 const D=Object.assign({voices:[],fav:[]},loadJ(K_DATA,{}));
 if(!Array.isArray(D.voices))D.voices=[];if(!Array.isArray(D.fav))D.fav=[];
-const L=Object.assign({voice:'af_heart',speed:1,p1:250,p2:600,p3:1000,trim:true,fmt:'wav',mode:'each',fname:'voice',dev:'auto',hmax:20,txt:'',fold:{},slowF:0.85,cmp:{}},loadJ(K_LOCAL,{}));
+const L=Object.assign({voice:'af_heart',speed:1,p1:250,p2:600,p3:1000,trim:true,fmt:'wav',mode:'each',fname:'voice',dev:'auto',hmax:20,txt:'',fold:{},slowF:0.85,cmp:{},pcUrl:'http://127.0.0.1:8800',pcSlow:'slower, softer, solemn and hushed',pcN:3,dIns:'',dTxt:''},loadJ(K_LOCAL,{}));
 function saveD(){try{localStorage.setItem(K_DATA,JSON.stringify(D))}catch(e){toast('Không lưu được: bộ nhớ trình duyệt đầy')}}
 function saveL(){try{localStorage.setItem(K_LOCAL,JSON.stringify(L))}catch(e){}}
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
@@ -285,6 +310,7 @@ const IDB={db:null,
 
 // ---------- Giọng: mô tả & trộn ----------
 function voiceSpec(key){ // trả về {name, mix:[{v,w}], speed?}
+ if(String(key).startsWith('pc:'))return{name:key.slice(3)+' (PC)',pc:key.slice(3)};
  if(BMAP[key])return{name:BMAP[key].n+' ('+accName(BMAP[key].acc)+')',mix:[{v:key,w:1}]};
  const v=myVoices().find(x=>x.id===key);
  if(v)return{name:v.name,mix:v.mix,speed:v.speed};
@@ -396,11 +422,12 @@ function begin(b){G.busy=true;G.started=false;G.cancel=false;Engine._cancel=fals
 function progText(f,t0,lab){const b=G.box;$(b.bar).style.width=(Math.min(1,f)*100).toFixed(1)+'%';const el=(performance.now()-t0)/1000;$(b.info).textContent=lab+' · đã chạy '+fmtT(el)+(f>0.02?' · còn khoảng '+fmtT(el/f-el):'')}
 function end(){G.busy=false;$('#go').disabled=$('#cgo').disabled=false;Engine.onSent=null;if(G.box)$(G.box.stop).style.visibility='hidden'}
 const curP=()=>({p1:+$('#p1').value,p2:+$('#p2').value,p3:+$('#p3').value,trim:$('#trim').checked});
-async function renderScript(segs,mix,speed,P,onProg){const total=segs.reduce((a,g)=>a+g.lines.length,0);let done=0;const out=[];
+async function renderScript(segs,vo,speed,P,onProg){const total=segs.reduce((a,g)=>a+g.lines.length,0);let done=0;const out=[];
  for(let si=0;si<segs.length&&!G.cancel;si++){const g=segs[si],sp=g.slow?speed*g.slow:speed,pm=g.slow?1.5:1,parts=[];
   for(let li=0;li<g.lines.length&&!G.cancel;li++){
    Engine.onSent=(i,n)=>onProg&&onProg((done+(i+1)/n)/total,si,segs.length,i,n);
-   const r=await Engine.synth(g.lines[li],mix,sp);
+   let r;if(vo.pc){onProg&&onProg((done+0.5)/total,si,segs.length,0,1);const a=await PC.tts(vo.pc,g.lines[li],g.slow?L.pcSlow:'');r={audios:[a],cancelled:false}}
+   else r=await Engine.synth(g.lines[li],vo.mix,sp);
    r.audios.forEach((x,k)=>{if(k)parts.push(sil(P.p1*pm));parts.push(P.trim?trimSil(x):x)});
    if(li<g.lines.length-1)parts.push(sil(P.p2*pm));
    done++;if(r.cancelled)G.cancel=true}
@@ -419,8 +446,8 @@ async function generate(){if(G.busy)return toast('Đang tạo, chờ xong hoặc
  const segs=parseScript(text);if(!segs.length)return toast('Kịch bản trống');
  const spec=voiceSpec(L.voice),speed=+$('#spd').value,P=curP();
  begin(RB);$('#res').innerHTML='';const t0=performance.now();
- try{await Engine.load();G.started=true;
-  const out=await renderScript(segs,spec.mix,speed,P,(f,si,ns,i,n)=>progText(f,t0,`Đoạn ${si+1}/${ns} · câu ${i+1}/${n}`));
+ try{if(!spec.pc)await Engine.load();G.started=true;
+  const out=await renderScript(segs,spec,speed,P,(f,si,ns,i,n)=>progText(f,t0,`Đoạn ${si+1}/${ns} · câu ${i+1}/${n}`));
   const el=(performance.now()-t0)/1000;
   if(!out.length){$('#prog').style.display='none';toast('Đã dừng, chưa có đoạn nào');return}
   const audioSec=out.reduce((x,o)=>x+o.f.length/SR,0);
@@ -439,9 +466,9 @@ $('#stop').onclick=()=>stopNow(RB);$('#cstop').onclick=()=>stopNow(CB);
 const CMP=[['c1','Fable',[['bm_fable',100]]],['c2','George',[['bm_george',100]]],['c3','Fable60 George40',[['bm_fable',60],['bm_george',40]]],
  ['c4','Fable50 Michael50',[['bm_fable',50],['am_michael',50]]],['c5','George50 Puck30 Fable20',[['bm_george',50],['am_puck',30],['bm_fable',20]]],
  ['c6','Fable40 Fenrir30 Lewis30',[['bm_fable',40],['am_fenrir',30],['bm_lewis',30]]]].map(([id,name,m])=>({id,name,mix:m.map(([v,w])=>({v,w})),preset:true}));
-const cmpItems=()=>[...CMP,...myVoices().map(v=>({id:v.id,name:v.name,mix:v.mix,speed:v.speed}))];
+const cmpItems=()=>[...CMP,...myVoices().map(v=>({id:v.id,name:v.name,mix:v.mix,speed:v.speed})),...PC.voices().map(v=>({id:'pc:'+v.name,name:v.name+' (PC)',pc:v.name}))];
 function cmpState(it){const o=L.cmp[it.id]||{};return{on:'on'in o?o.on:!!it.preset,speed:+o.speed||it.speed||1}}
-function renderCmpList(){$('#clist').innerHTML=cmpItems().map(it=>{const st=cmpState(it);return`<div class="it"><input type="checkbox" data-con="${it.id}"${st.on?' checked':''} style="width:20px;height:20px;flex:none"><div class="tx"><div><b>${esc(it.name)}</b>${it.preset?'':' <span class="grade">của bạn</span>'}</div><div class="muted small">${esc(mixText(it.mix))}</div></div>${it.preset?`<button class="sm" data-csave="${it.id}">Lưu</button>`:''}<input type="number" inputmode="decimal" min="0.5" max="2" step="0.05" value="${st.speed}" data-csp="${it.id}" style="width:74px;flex:none;padding:6px"></div>`}).join('');
+function renderCmpList(){$('#clist').innerHTML=cmpItems().map(it=>{const st=cmpState(it);return`<div class="it"><input type="checkbox" data-con="${it.id}"${st.on?' checked':''} style="width:20px;height:20px;flex:none"><div class="tx"><div><b>${esc(it.name)}</b>${it.preset?'':' <span class="grade">của bạn</span>'}</div><div class="muted small">${esc(it.pc?'Giọng trên PC, tốc độ do mô hình quyết định':mixText(it.mix))}</div></div>${it.preset?`<button class="sm" data-csave="${it.id}">Lưu</button>`:''}<input type="number" inputmode="decimal" min="0.5" max="2" step="0.05" value="${st.speed}" data-csp="${it.id}" style="width:74px;flex:none;padding:6px"></div>`}).join('');
  const get=id=>cmpItems().find(x=>x.id===id),set=(id,k,v)=>{L.cmp[id]=Object.assign(cmpState(get(id)),L.cmp[id],{[k]:v});saveL()};
  $$('#clist [data-con]').forEach(e=>e.onchange=()=>set(e.dataset.con,'on',e.checked));
  $$('#clist [data-csp]').forEach(e=>e.onchange=()=>{let v=parseFloat(String(e.value).replace(',','.'));if(!(v>=0.5&&v<=2))v=1;e.value=v;set(e.dataset.csp,'speed',v)});
@@ -451,9 +478,9 @@ let CR=[];
 async function runCompare(){if(G.busy)return toast('Đang tạo, chờ xong hoặc bấm Dừng');const text=$('#txt').value.trim();if(!text)return toast('Chưa có kịch bản ở tab Đọc');
  const segs=parseScript(text);if(!segs.length)return toast('Kịch bản trống');const items=cmpItems().filter(it=>cmpState(it).on);if(!items.length)return toast('Chưa chọn giọng nào');
  const P=curP();begin(CB);CR=[];$('#cres').innerHTML='';const t0=performance.now();
- try{await Engine.load();G.started=true;
+ try{if(items.some(it=>!it.pc))await Engine.load();G.started=true;
   for(let k=0;k<items.length&&!G.cancel;k++){const it=items[k],sp=cmpState(it).speed;
-   const out=await renderScript(segs,it.mix,sp,P,(f,si,ns)=>progText((k+f)/items.length,t0,`Giọng ${k+1}/${items.length}: ${it.name} · đoạn ${si+1}/${ns}`));
+   const out=await renderScript(segs,it,sp,P,(f,si,ns)=>progText((k+f)/items.length,t0,`Giọng ${k+1}/${items.length}: ${it.name} · đoạn ${si+1}/${ns}`));
    if(!out.length)break;const f=out.length>1?mergeOut(out,P.p3):out[0].f;
    CR.push({it,sp,blob:wav(f),m:measure(f,out.reduce((x,o)=>x+countW(o.text),0)),partial:G.cancel});renderCmp()}
   $(CB.title).textContent=G.cancel?'Đã dừng':'Xong';$(CB.bar).style.width='100%';$(CB.info).textContent=`${CR.length} giọng trong ${fmtT((performance.now()-t0)/1000)}`}
@@ -472,7 +499,7 @@ $('#cgo').onclick=runCompare;
 
 function renderResult(h,box=$('#res')){const ext=L.fmt==='mp3'?'mp3':'wav';const multi=h.segs.length>1;
  let s=`<div class="card"><h3>Kết quả${h.partial?' (chưa đủ)':''}</h3><div class="fb"><div class="muted small">${esc(h.voice)} · ${nf(h.speed,2)}× · ${h.segs.length} đoạn · tổng ${fmtT(h.dur)}</div><div class="list">`;
- h.segs.forEach((g,k)=>{s+=`<div class="it"><div class="tx"><div><b>${String(g.i).padStart(2,'0')}</b> ${esc(g.text)}</div><div class="muted small">${fmtT(g.dur)} · ${fname(g.i)}.${ext}${g.slow?' · chậm ×'+nf(g.slow,2):''}</div></div><button class="ic" data-pl="${k}">▶</button><button class="ic" data-dl="${k}">⬇</button></div>`});
+ h.segs.forEach((g,k)=>{s+=`<div class="it"><div class="tx"><div><b>${String(g.i).padStart(2,'0')}</b> ${esc(g.text)}</div><div class="muted small">${fmtT(g.dur)} · ${fname(g.i)}.${ext}${g.slow?(String(h.voiceKey).startsWith('pc:')?' · đoạn chậm (nghỉ dài hơn)':' · chậm ×'+nf(g.slow,2)):''}</div></div><button class="ic" data-pl="${k}">▶</button><button class="ic" data-dl="${k}">⬇</button></div>`});
  s+='</div><div class="row" style="margin-top:8px">';
  if(L.mode!=='merge'&&multi)s+='<button class="pri" data-z="1">⬇ Tải tất cả (.zip)</button>';
  if((L.mode!=='each'||!multi)&&h.merged)s+=`<button class="pri" data-m="1">⬇ File gộp (${fmtT(h.dur)})</button>`;
@@ -505,6 +532,59 @@ async function renderHist(){let all=[];try{all=(await IDB.all()).sort((a,b)=>b.t
   G.last=h;renderResult(h);$('#prog').style.display='none';tab('t-doc');window.scrollTo(0,document.body.scrollHeight);toast('Đã mở lại bản tạo lúc '+fmtD(h.t))});
  $$('#hlist [data-hd]').forEach(b=>b.onclick=async()=>{if(await ask('Xóa bản này?','Xóa âm thanh đã tạo lúc '+fmtD(get(b.dataset.hd).t)+'. Không khôi phục được.','Xóa',true)){await IDB.del(b.dataset.hd);renderHist()}})}
 
+// ---------- Giọng trên PC ----------
+const E_PROMPT="A young male narrator, around 23, a fresh journalism graduate on his first big field assignment. Bright, clear mid-range tenor, youthful but not childish, with a light, modern British accent. He sounds genuinely thrilled, as if he just discovered something amazing at an ancient site and can't wait to share it: warm, smiling voice, lively pace around 165 words per minute, natural rises of wonder on surprising facts, playful emphasis on key numbers and names. In dramatic moments he slows down and drops to a hushed, intense tone. Curious, sincere and friendly, never shouting, never salesy. Crisp broadcast-reporter diction. Clean close-mic studio recording, no reverb, no rasp, no breathiness. Even, conversational delivery; the excitement shows in warmth and a smile, not in big pitch swings.";
+const D_TXT="I'm standing on a narrow strip of land in central Greece, and honestly, I can't believe I'm here. Two and a half thousand years ago, three hundred Spartans held this very pass. Here's the part I love: before the battle, they were calmly combing their long hair.";
+const PC={st:null,
+ url(){return(L.pcUrl||'http://127.0.0.1:8800').trim().replace(/\/+$/,'')},
+ voices(){return(this.st&&this.st.voices)||[]},
+ async status(ms=4000){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);
+  try{const r=await fetch(this.url()+'/status',{cache:'no-store',signal:c.signal});const j=await r.json();if(!j||j.app!=='fox-voice-pc')throw new Error('Địa chỉ này không phải máy chủ Fox-voice PC');this.st=j;return j}
+  catch(e){this.st=null;throw new Error(e.name==='AbortError'?'Không phản hồi (quá thời gian chờ)':e.message)}finally{clearTimeout(t)}},
+ async post(path,body){let r;
+  try{r=await fetch(this.url()+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})}
+  catch(e){throw new Error('Không kết nối được máy chủ PC ('+this.url()+'). Mở ChayQwen.bat hoặc ChayVoxCPM.bat rồi thử lại.')}
+  if(!r.ok){let m='HTTP '+r.status;try{m=(await r.json()).error||m}catch(e){}throw new Error(m)}return r},
+ async tts(voice,text,style){const r=await this.post('/tts',{voice,text,style});return new Float32Array(await r.arrayBuffer())},
+ async design(instruct,text,seed){const r=await this.post('/design',{instruct,text,seed});const f=new Float32Array(await r.arrayBuffer());return{f,id:r.headers.get('X-Design-Id'),seed:+r.headers.get('X-Seed'),sec:+r.headers.get('X-Seconds')}}};
+const engName=e=>({qwen:'Qwen3-TTS',vox:'VoxCPM2',fake:'Bộ đọc giả (kiểm tra)'}[e]||e);
+function pcErrHtml(m){return'<div class="err">'+esc(m)+'<br>Kiểm tra: (1) cửa sổ ChayQwen.bat hoặc ChayVoxCPM.bat đang mở và không báo lỗi; (2) địa chỉ đúng cổng (Qwen3 8800, VoxCPM2 8801); (3) nếu Chrome hỏi "cho phép truy cập thiết bị trong mạng cục bộ", bấm Cho phép; (4) mở bằng Chrome hoặc Edge trên chính máy tính đó.</div>'}
+async function pcRefresh(show){const box=$('#pcinfo'),st=$('#pcst');
+ try{const j=await PC.status();const g=j.gpu?`${esc(j.gpu)} ${j.vram_gb} GB`:'<span style="color:var(--bad)">không thấy GPU, chạy bằng CPU (rất chậm)</span>';
+  const h=`Đã kết nối: <b>${engName(j.engine)}</b> · ${g} · ${j.voices.length} giọng đã lưu${j.can_style?' · chỉnh được giọng điệu từng đoạn':''}`;
+  box.innerHTML='<div class="okb">'+h+'</div>';st.innerHTML=h}
+ catch(e){box.innerHTML=show?pcErrHtml(e.message):'<div class="muted small" style="margin-top:6px">Chưa kết nối.</div>';st.innerHTML='Chưa kết nối máy chủ PC. Mở ChayQwen.bat rồi vào Cài đặt → Giọng trên PC → Kiểm tra kết nối.'+(show?'':'')}
+ renderPcList();renderVSel();renderCmpList()}
+function renderPcList(){const vs=PC.voices();
+ $('#pclist').innerHTML=vs.length?vs.map((v,k)=>`<div class="it"><div class="tx"><div><b>${esc(v.name)}</b></div><div class="muted small">${esc(engName(v.engine||''))} · seed ${v.seed}</div></div><button class="ic" data-pp="${k}">▶</button><button class="sm" data-pu="${k}">Dùng</button><button class="ic red" data-pd="${k}">✕</button></div>`).join(''):'<div class="muted small">Chưa có giọng nào trên PC</div>';
+ $$('#pclist [data-pp]').forEach(b=>b.onclick=async()=>{const v=vs[+b.dataset.pp];if(preview.busy)return toast('Đang tạo bản nghe thử khác');preview.busy=true;const t=b.textContent;b.disabled=true;b.textContent='…';
+  try{const f=await PC.tts(v.name,$('#ltxt').value.trim()||D_TXT,'');b.textContent=t;b.disabled=false;play(wav(trimSil(f)),null)}catch(e){toast('Lỗi: '+e.message,4500)}finally{preview.busy=false;b.disabled=false;b.textContent=t}});
+ $$('#pclist [data-pu]').forEach(b=>b.onclick=()=>{L.voice='pc:'+vs[+b.dataset.pu].name;saveL();renderVSel();tab('t-doc');toast('Đã chọn giọng '+vs[+b.dataset.pu].name+' ở tab Đọc')});
+ $$('#pclist [data-pd]').forEach(b=>b.onclick=async()=>{const v=vs[+b.dataset.pd];if(!(await ask('Xóa giọng trên PC?','Giọng "'+esc(v.name)+'" sẽ được chuyển vào thư mục giong-da-xoa trên PC (vẫn khôi phục được).','Xóa',true)))return;
+  try{await PC.post('/delete',{voice:v.name});if(L.voice==='pc:'+v.name){L.voice='af_heart';saveL()}await pcRefresh();toast('Đã chuyển vào giong-da-xoa')}catch(e){toast('Lỗi: '+e.message,4500)}})}
+const DS=[];
+async function designRun(){if(G.busy||DS.busy)return toast('Đang tạo, chờ xong đã');const ins=$('#dins').value.trim(),txt=$('#dtxt').value.trim();if(!ins||!txt)return toast('Cần mô tả giọng và câu mẫu');
+ if(!PC.st){try{await PC.status()}catch(e){$('#dinfo').innerHTML=pcErrHtml(e.message);return}}
+ const n=+$('#dn').value||3;DS.busy=true;$('#dgo').disabled=true;const t0=performance.now();
+ try{for(let k=0;k<n;k++){$('#dinfo').textContent=`Đang tạo mẫu ${k+1}/${n}… (lần đầu phải nạp mô hình, có thể mất 1–2 phút)`;
+   const seed=1+Math.floor(Math.random()*999999);const r=await PC.design(ins,txt,seed);DS.unshift({id:r.id,seed:r.seed||seed,f:r.f,blob:wav(trimSil(r.f)),sec:r.sec,ins});DS.splice(12);renderDesigns()}
+  $('#dinfo').textContent=`Xong ${n} mẫu trong ${fmtT((performance.now()-t0)/1000)}. Nghe rồi bấm Lưu mẫu ưng nhất.`}
+ catch(e){$('#dinfo').innerHTML=pcErrHtml(e.message)}finally{DS.busy=false;$('#dgo').disabled=false}}
+function renderDesigns(){$('#dlist').innerHTML=DS.map((d,k)=>`<div class="it"><div class="tx"><div><b>Mẫu seed ${d.seed}</b></div><div class="muted small">${fmtT(d.f.length/SR)} âm thanh · tạo trong ${nf(d.sec||0,1)} giây</div></div><button class="ic" data-dp="${k}">▶</button><button class="pri sm" data-ds="${k}">Lưu</button></div>`).join('');
+ $$('#dlist [data-dp]').forEach(b=>b.onclick=()=>play(DS[+b.dataset.dp].blob,b));
+ $$('#dlist [data-ds]').forEach(b=>b.onclick=async()=>{const d=DS[+b.dataset.ds];const name=await askName('Ravenscroll '+d.seed);if(!name)return;
+  if(PC.voices().some(v=>v.name.toLowerCase()===name.toLowerCase())&&!(await ask('Trùng tên','Đã có giọng "'+esc(name)+'" trên PC. Ghi đè?','Ghi đè',true)))return;
+  try{await PC.post('/save',{design_id:d.id,name});await pcRefresh();toast('Đã lưu giọng "'+name+'" trên PC')}catch(e){toast('Lỗi: '+e.message,4500)}})}
+function askName(def){return new Promise(r=>{$('#dlgt').textContent='Đặt tên giọng';$('#dlgm').innerHTML='<input id="dlgin" autocomplete="off" style="margin-top:6px">';const i=$('#dlgin');i.value=def;
+ const y=$('#dlgy');y.textContent='Lưu';y.className='pri';$('#dlg').classList.add('on');setTimeout(()=>{i.focus();i.select()},50);
+ const done=v=>{$('#dlg').classList.remove('on');y.onclick=$('#dlgn').onclick=null;r(v)};y.onclick=()=>{const v=i.value.trim().replace(/[^A-Za-z0-9 _.-]+/g,'').slice(0,60);if(!v){toast('Tên chỉ gồm chữ không dấu, số, khoảng trắng');return}done(v)};$('#dlgn').onclick=()=>done(null)})}
+$('#dgo').onclick=designRun;
+$('#pcchk').onclick=()=>{$('#pcinfo').innerHTML='<div class="muted small" style="margin-top:6px">Đang kiểm tra…</div>';pcRefresh(true)};
+$$('[data-pcu]').forEach(b=>b.onclick=()=>{L.pcUrl='http://127.0.0.1:'+b.dataset.pcu;$('#pcurl').value=L.pcUrl;saveL();$('#pcchk').click()});
+$('#pcurl').onchange=()=>{L.pcUrl=$('#pcurl').value.trim();saveL()};
+$('#pcslow').oninput=()=>{L.pcSlow=$('#pcslow').value;saveL()};
+$('#dins').oninput=()=>{L.dIns=$('#dins').value;saveL()};$('#dtxt').oninput=()=>{L.dTxt=$('#dtxt').value;saveL()};$('#dn').onchange=()=>{L.pcN=+$('#dn').value;saveL()};
+
 // ---------- Chọn giọng ----------
 function renderVSel(){const favs=D.fav;const my=myVoices();
  const fav=[...my.filter(v=>v.fav).map(v=>v.id),...favs.filter(id=>BMAP[id])];
@@ -512,10 +592,12 @@ function renderVSel(){const favs=D.fav;const my=myVoices();
  const bl=b=>`${b.n} · ${accName(b.acc)} · ${b.g==='F'?'Nữ':'Nam'} · ${b.gr}`;
  let s='';
  if(fav.length)s+='<optgroup label="★ Yêu thích">'+fav.map(k=>opt(k,'★ '+(BMAP[k]?bl(BMAP[k]):my.find(v=>v.id===k).name))).join('')+'</optgroup>';
+ const pcv=PC.voices().map(v=>'pc:'+v.name);if(String(L.voice).startsWith('pc:')&&!pcv.includes(L.voice))pcv.push(L.voice);
+ if(pcv.length)s+='<optgroup label="Giọng trên PC">'+pcv.map(k=>opt(k,k.slice(3)+(PC.voices().some(v=>'pc:'+v.name===k)?' (PC)':' (PC, chưa kết nối)'))).join('')+'</optgroup>';
  const myN=my.filter(v=>!v.fav);if(myN.length)s+='<optgroup label="Giọng của bạn">'+myN.map(v=>opt(v.id,v.name)).join('')+'</optgroup>';
  s+='<optgroup label="Giọng gốc">'+BASE.filter(b=>!favs.includes(b.id)).map(b=>opt(b.id,bl(b))).join('')+'</optgroup>';
- const sel=$('#vsel');sel.innerHTML=s;if(!sel.value||(!BMAP[L.voice]&&!my.some(v=>v.id===L.voice))){L.voice='af_heart';sel.value='af_heart'}}
-$('#vsel').onchange=()=>{L.voice=$('#vsel').value;const sp=voiceSpec(L.voice).speed;if(sp){$('#spd').value=sp;L.speed=sp;showRng()}saveL();renderTStat()};
+ const sel=$('#vsel');sel.innerHTML=s;if(!sel.value||(!BMAP[L.voice]&&!my.some(v=>v.id===L.voice)&&!String(L.voice).startsWith('pc:'))){L.voice='af_heart';sel.value='af_heart'}}
+$('#vsel').onchange=()=>{L.voice=$('#vsel').value;if(L.voice.startsWith('pc:'))toast('Giọng trên PC: tốc độ và giọng điệu do mô hình quyết định, thanh Tốc độ không áp dụng',3500);const sp=voiceSpec(L.voice).speed;if(sp){$('#spd').value=sp;L.speed=sp;showRng()}saveL();renderTStat()};
 
 // ---------- Tạo giọng (trộn) ----------
 let EDIT=null;let MIX=[{v:'am_michael',w:60},{v:'bm_fable',w:40}];
@@ -594,7 +676,8 @@ $('#txt').oninput=()=>{L.txt=$('#txt').value;clearTimeout(saveL._t);saveL._t=set
 $('#go').onclick=generate;
 $('#ver').textContent=APP_VER;
 $('#txt').value=L.txt||'';
-applyL();initFold();renderVSel();renderMix();renderMy();renderCmpList();renderBase();renderTStat();renderMInfo();
+$('#pcurl').value=L.pcUrl;$('#pcslow').value=L.pcSlow;$('#dins').value=L.dIns||E_PROMPT;$('#dtxt').value=L.dTxt||D_TXT;$('#dn').value=String(L.pcN||3);
+applyL();initFold();renderVSel();renderMix();renderMy();renderCmpList();renderBase();renderTStat();renderMInfo();pcRefresh(false);
 if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body>

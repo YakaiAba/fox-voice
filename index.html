@@ -13,7 +13,10 @@
 :root{--c:#5B6B8C;--c2:#46536e;--bg:#f4f4f6;--soft:#eef2fb;--ok:#2e7d32;--bad:#c62828;--line:#e3e5ea;--mut:#777}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:#222;font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.45;-webkit-text-size-adjust:100%}
-body{padding-bottom:calc(70px + env(safe-area-inset-bottom))}
+body{padding-bottom:calc(70px + env(safe-area-inset-bottom));-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea,select,[contenteditable],.err,.copy{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+button,nav,.card>h3,.seg,label,.star,.list .it{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;touch-action:manipulation}
+img,svg{-webkit-user-drag:none;user-drag:none}
 header{position:sticky;top:0;z-index:5;background:#fff;color:var(--c);border-bottom:1px solid var(--line);padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px}
 header h1{font-size:17px;font-weight:700;margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #mstat{font-size:12px;font-weight:500;color:#6b7280;background:var(--soft);padding:3px 8px;border-radius:10px;white-space:nowrap}
@@ -274,7 +277,7 @@ nav button.on{background:var(--soft);color:var(--c);font-weight:700}
 
 <script>
 'use strict';
-const APP_VER='1.5 (11/11/2026)';
+const APP_VER='1.6 (11/11/2026)';
 const SR=24000;
 const MODEL_ID='onnx-community/Kokoro-82M-v1.0-ONNX';
 const KOKORO_URLS=['https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js','https://unpkg.com/kokoro-js@1.2.1/dist/kokoro.web.js'];
@@ -677,6 +680,8 @@ $('#bfile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f
 // ---------- Khung chung ----------
 function tab(id){$$('.tab').forEach(t=>t.classList.toggle('on',t.id===id));$$('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===id));if(id==='t-his')renderHist();window.scrollTo(0,0)}
 $$('nav button').forEach(b=>b.onclick=()=>tab(b.dataset.t));
+document.addEventListener('contextmenu',e=>{if(e.target.closest('button,nav,.card>h3,.seg,.list .it'))e.preventDefault()});
+document.addEventListener('dragstart',e=>{if(e.target.closest&&e.target.closest('button,img,svg,nav'))e.preventDefault()});
 const FOLD_IC=[['Kịch bản','📝'],['Giọng đọc','🎙️'],['Ngắt nghỉ','⏸️'],['Xuất file','💾'],['Kết quả','✅'],['Thiết kế giọng','🖥️'],['Giọng của bạn','⭐'],['Tạo giọng mới','🧪'],['Sửa giọng','🧪'],['So sánh','⚖️'],['28 giọng','📚'],['Clone','🧬'],['Lịch sử tạo','🕘'],['Giọng trên PC','🔌'],['Mô hình đọc','🧠'],['Lịch sử','🗂️'],['Sao lưu','☁️'],['Hướng dẫn','📖']];
 const foldIcon=t=>((FOLD_IC.find(([k])=>t.trim().startsWith(k))||[0,'•'])[1]);
 function initFold(){$$('.card>h3').forEach((h,i)=>{const c=h.parentElement;h.dataset.ic=foldIcon(h.textContent);const key=(c.closest('.tab')||{}).id+':'+h.textContent.trim().slice(0,20);if(key in L.fold)c.classList.toggle('fold',L.fold[key]);

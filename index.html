@@ -277,7 +277,7 @@ nav button.on{background:var(--soft);color:var(--c);font-weight:700}
 
 <script>
 'use strict';
-const APP_VER='1.6 (11/11/2026)';
+const APP_VER='1.7 (11/11/2026)';
 const SR=24000;
 const MODEL_ID='onnx-community/Kokoro-82M-v1.0-ONNX';
 const KOKORO_URLS=['https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js','https://unpkg.com/kokoro-js@1.2.1/dist/kokoro.web.js'];
@@ -554,7 +554,7 @@ const D_TXT="I'm standing on a narrow strip of land in central Greece, and hones
 const PC={st:null,
  url(){return(L.pcUrl||'http://127.0.0.1:8800').trim().replace(/\/+$/,'')},
  voices(){return(this.st&&this.st.voices)||[]},
- async status(ms=4000){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);
+ async status(ms=10000){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);
   try{const r=await fetch(this.url()+'/status',{cache:'no-store',signal:c.signal});const j=await r.json();if(!j||j.app!=='fox-voice-pc')throw new Error('Địa chỉ này không phải máy chủ Fox-voice PC');this.st=j;return j}
   catch(e){this.st=null;throw new Error(e.name==='AbortError'?'Không phản hồi (quá thời gian chờ)':e.message)}finally{clearTimeout(t)}},
  async post(path,body){let r;

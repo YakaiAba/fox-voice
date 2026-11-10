@@ -1,5 +1,5 @@
 // Fox-voice service worker: trang lấy từ mạng trước (chờ 4 giây), lỗi thì dùng bản lưu
-const C='foxvoice-app-v3';
+const C='foxvoice-app-v4';
 const FILES=['./','./index.html','./icon-180.png','./icon-512.png'];
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(FILES)).catch(()=>{}))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k.startsWith('foxvoice-app-')&&k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});

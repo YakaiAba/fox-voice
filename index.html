@@ -206,12 +206,15 @@ nav button.on{background:var(--soft);color:var(--c);font-weight:700}
 <!-- ============ TAB CÀI ĐẶT ============ -->
 <section class="tab" id="t-set">
  <div class="card" id="pcset"><h3>Giọng trên PC</h3><div class="fb">
-  <div class="muted small">Dùng mô hình chạy trên máy tính (Qwen3-TTS hoặc VoxCPM2). Bấm đúp ChayQwen.bat hoặc ChayVoxCPM.bat trước, giữ cửa sổ mở.</div>
+  <div class="muted small">Dùng mô hình chạy trên máy tính (Qwen3-TTS hoặc VoxCPM2). Bấm đúp ChayQwen.bat, ChayVoxCPM.bat hoặc ChayQwenCoSan.bat trước, giữ cửa sổ mở.</div>
   <label>Địa chỉ máy chủ</label>
   <input id="pcurl" autocomplete="off" inputmode="url">
-  <div class="row" style="margin-top:8px"><button class="sm" data-pcu="8800">Qwen3 · cổng 8800</button><button class="sm" data-pcu="8801">VoxCPM2 · cổng 8801</button></div>
+  <div class="row" style="margin-top:8px"><button class="sm" data-pcu="8800">Qwen3 thiết kế · 8800</button><button class="sm" data-pcu="8801">VoxCPM2 · 8801</button></div>
+  <button class="sm" data-pcu="8802" style="width:100%;margin-top:8px">Qwen3 giọng có sẵn (Ryan, Aiden) · 8802</button>
   <button class="pri big" id="pcchk" style="margin-top:8px">Kiểm tra kết nối</button>
-  <label>Mô tả cho đoạn [slow] (chỉ VoxCPM2 dùng được)</label>
+  <label>Giọng điệu chung (Qwen3 giọng có sẵn, VoxCPM2; để trống = mặc định)</label>
+  <input id="pcstyle" autocomplete="off" placeholder="Warm, excited young documentary narrator, smiling…">
+  <label>Giọng điệu cho đoạn [slow] (Qwen3 giọng có sẵn, VoxCPM2)</label>
   <input id="pcslow" autocomplete="off">
   <div id="pcinfo"></div>
  </div></div>
@@ -249,7 +252,7 @@ nav button.on{background:var(--soft);color:var(--c);font-weight:700}
   <h4>5. So sánh giọng</h4>
   <p>Tab Tạo giọng → So sánh nhiều giọng: tích các giọng muốn thử, chỉnh tốc độ riêng, bấm Chạy. Mỗi giọng có số đo nhanh: từ/phút, tỷ lệ im lặng, chỗ nghỉ dài nhất. Màu xanh là đạt mốc 155–170 từ/phút và nghỉ không quá 0,8 giây.</p>
   <h4>6. Giọng trên PC (tự nhiên hơn)</h4>
-  <p>Cài một lần bằng CaiDat.bat trong thư mục pc. Mỗi lần dùng: bấm đúp ChayQwen.bat, mở Fox-voice trên Chrome của chính máy đó → Cài đặt → Giọng trên PC → Kiểm tra kết nối. Tab Tạo giọng → Thiết kế giọng trên PC: tạo vài mẫu từ mô tả, nghe, Lưu mẫu ưng nhất. Giọng đã lưu dùng như giọng thường ở tab Đọc và trong So sánh.</p>
+  <p>Cài một lần bằng CaiDat.bat trong thư mục pc. Mỗi lần dùng: bấm đúp ChayQwen.bat, mở Fox-voice trên Chrome của chính máy đó → Cài đặt → Giọng trên PC → Kiểm tra kết nối. Tab Tạo giọng → Thiết kế giọng trên PC: tạo vài mẫu từ mô tả, nghe, Lưu mẫu ưng nhất. Giọng đã lưu dùng như giọng thường ở tab Đọc và trong So sánh. Giọng có sẵn của Qwen3 (Ryan, Aiden): cài thêm bằng CaiQwenCoSan.bat, chạy ChayQwenCoSan.bat, chọn cổng 8802; chỉnh giọng điệu chung và giọng điệu đoạn [slow] trong Cài đặt → Giọng trên PC.</p>
   <h4>7. Lưu ý</h4>
   <ul><li>Chỉ đọc tiếng Anh (Mỹ và Anh).</li>
   <li>Mọi xử lý chạy trong máy, không gửi văn bản đi đâu.</li>
@@ -271,7 +274,7 @@ nav button.on{background:var(--soft);color:var(--c);font-weight:700}
 
 <script>
 'use strict';
-const APP_VER='1.4 (11/11/2026)';
+const APP_VER='1.5 (11/11/2026)';
 const SR=24000;
 const MODEL_ID='onnx-community/Kokoro-82M-v1.0-ONNX';
 const KOKORO_URLS=['https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js','https://unpkg.com/kokoro-js@1.2.1/dist/kokoro.web.js'];
@@ -303,7 +306,7 @@ const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='M
 function loadJ(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v&&typeof v==='object'?v:d}catch(e){return d}}
 const D=Object.assign({voices:[],fav:[]},loadJ(K_DATA,{}));
 if(!Array.isArray(D.voices))D.voices=[];if(!Array.isArray(D.fav))D.fav=[];
-const L=Object.assign({voice:'af_heart',speed:1,p1:250,p2:600,p3:1000,trim:true,fmt:'wav',mode:'each',fname:'voice',dev:'auto',hmax:20,txt:'',fold:{},slowF:0.85,cmp:{},pcUrl:'http://127.0.0.1:8800',pcSlow:'slower, softer, solemn and hushed',pcN:3,dIns:'',dTxt:''},loadJ(K_LOCAL,{}));
+const L=Object.assign({voice:'af_heart',speed:1,p1:250,p2:600,p3:1000,trim:true,fmt:'wav',mode:'each',fname:'voice',dev:'auto',hmax:20,txt:'',fold:{},slowF:0.85,cmp:{},pcUrl:'http://127.0.0.1:8800',pcSlow:'slower, softer, solemn and hushed',pcStyle:'',pcN:3,dIns:'',dTxt:''},loadJ(K_LOCAL,{}));
 function saveD(){try{localStorage.setItem(K_DATA,JSON.stringify(D))}catch(e){toast('Không lưu được: bộ nhớ trình duyệt đầy')}}
 function saveL(){try{localStorage.setItem(K_LOCAL,JSON.stringify(L))}catch(e){}}
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
@@ -436,7 +439,7 @@ async function renderScript(segs,vo,speed,P,onProg){const total=segs.reduce((a,g
  for(let si=0;si<segs.length&&!G.cancel;si++){const g=segs[si],sp=g.slow?speed*g.slow:speed,pm=g.slow?1.5:1,parts=[];
   for(let li=0;li<g.lines.length&&!G.cancel;li++){
    Engine.onSent=(i,n)=>onProg&&onProg((done+(i+1)/n)/total,si,segs.length,i,n);
-   let r;if(vo.pc){onProg&&onProg((done+0.5)/total,si,segs.length,0,1);const a=await PC.tts(vo.pc,g.lines[li],g.slow?L.pcSlow:'');r={audios:[a],cancelled:false}}
+   let r;if(vo.pc){onProg&&onProg((done+0.5)/total,si,segs.length,0,1);const a=await PC.tts(vo.pc,g.lines[li],g.slow?L.pcSlow:(L.pcStyle||''));r={audios:[a],cancelled:false}}
    else r=await Engine.synth(g.lines[li],vo.mix,sp);
    r.audios.forEach((x,k)=>{if(k)parts.push(sil(P.p1*pm));parts.push(P.trim?trimSil(x):x)});
    if(li<g.lines.length-1)parts.push(sil(P.p2*pm));
@@ -553,12 +556,12 @@ const PC={st:null,
   catch(e){this.st=null;throw new Error(e.name==='AbortError'?'Không phản hồi (quá thời gian chờ)':e.message)}finally{clearTimeout(t)}},
  async post(path,body){let r;
   try{r=await fetch(this.url()+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})}
-  catch(e){throw new Error('Không kết nối được máy chủ PC ('+this.url()+'). Mở ChayQwen.bat hoặc ChayVoxCPM.bat rồi thử lại.')}
+  catch(e){throw new Error('Không kết nối được máy chủ PC ('+this.url()+'). Mở ChayQwen.bat, ChayVoxCPM.bat hoặc ChayQwenCoSan.bat rồi thử lại.')}
   if(!r.ok){let m='HTTP '+r.status;try{m=(await r.json()).error||m}catch(e){}throw new Error(m)}return r},
  async tts(voice,text,style){const r=await this.post('/tts',{voice,text,style});return new Float32Array(await r.arrayBuffer())},
  async design(instruct,text,seed){const r=await this.post('/design',{instruct,text,seed});const f=new Float32Array(await r.arrayBuffer());return{f,id:r.headers.get('X-Design-Id'),seed:+r.headers.get('X-Seed'),sec:+r.headers.get('X-Seconds')}}};
-const engName=e=>({qwen:'Qwen3-TTS',vox:'VoxCPM2',fake:'Bộ đọc giả (kiểm tra)'}[e]||e);
-function pcErrHtml(m){return'<div class="err">'+esc(m)+'<br>Kiểm tra: (1) cửa sổ ChayQwen.bat hoặc ChayVoxCPM.bat đang mở và không báo lỗi; (2) địa chỉ đúng cổng (Qwen3 8800, VoxCPM2 8801); (3) nếu Chrome hỏi "cho phép truy cập thiết bị trong mạng cục bộ", bấm Cho phép; (4) mở bằng Chrome hoặc Edge trên chính máy tính đó.</div>'}
+const engName=e=>({qwen:'Qwen3 thiết kế giọng',qwenc:'Qwen3 giọng có sẵn',vox:'VoxCPM2',fake:'Bộ đọc giả (kiểm tra)',fakec:'Bộ đọc giả có sẵn (kiểm tra)'}[e]||e);
+function pcErrHtml(m){return'<div class="err">'+esc(m)+'<br>Kiểm tra: (1) cửa sổ ChayQwen.bat hoặc ChayVoxCPM.bat đang mở và không báo lỗi; (2) địa chỉ đúng cổng (Qwen3 thiết kế 8800, VoxCPM2 8801, Qwen3 giọng có sẵn 8802); (3) nếu Chrome hỏi "cho phép truy cập thiết bị trong mạng cục bộ", bấm Cho phép; (4) mở bằng Chrome hoặc Edge trên chính máy tính đó.</div>'}
 async function pcRefresh(show){const box=$('#pcinfo'),st=$('#pcst');
  try{const j=await PC.status();const g=j.gpu?`${esc(j.gpu)} ${j.vram_gb} GB`:'<span style="color:var(--bad)">không thấy GPU, chạy bằng CPU (rất chậm)</span>';
   const h=`Đã kết nối: <b>${engName(j.engine)}</b> · ${g} · ${j.voices.length} giọng đã lưu${j.can_style?' · chỉnh được giọng điệu từng đoạn':''}`;
@@ -566,9 +569,9 @@ async function pcRefresh(show){const box=$('#pcinfo'),st=$('#pcst');
  catch(e){box.innerHTML=show?pcErrHtml(e.message):'<div class="muted small" style="margin-top:6px">Chưa kết nối.</div>';st.innerHTML='Chưa kết nối máy chủ PC. Mở ChayQwen.bat rồi vào Cài đặt → Giọng trên PC → Kiểm tra kết nối.'+(show?'':'')}
  renderPcList();renderVSel();renderCmpList()}
 function renderPcList(){const vs=PC.voices();
- $('#pclist').innerHTML=vs.length?vs.map((v,k)=>`<div class="it"><div class="tx"><div><b>${esc(v.name)}</b></div><div class="muted small">${esc(engName(v.engine||''))} · seed ${v.seed}</div></div><button class="ic" data-pp="${k}">▶</button><button class="sm" data-pu="${k}">Dùng</button><button class="ic red" data-pd="${k}">✕</button></div>`).join(''):'<div class="muted small">Chưa có giọng nào trên PC</div>';
+ $('#pclist').innerHTML=vs.length?vs.map((v,k)=>`<div class="it"><div class="tx"><div><b>${esc(v.name)}</b></div><div class="muted small">${esc(engName(v.engine||''))}${v.preset?' · giọng có sẵn':' · seed '+v.seed}</div></div><button class="ic" data-pp="${k}">▶</button><button class="sm" data-pu="${k}">Dùng</button>${v.preset?'':`<button class="ic red" data-pd="${k}">✕</button>`}</div>`).join(''):'<div class="muted small">Chưa có giọng nào trên PC</div>';
  $$('#pclist [data-pp]').forEach(b=>b.onclick=async()=>{const v=vs[+b.dataset.pp];if(preview.busy)return toast('Đang tạo bản nghe thử khác');preview.busy=true;const t=b.textContent;b.disabled=true;b.textContent='…';
-  try{const f=await PC.tts(v.name,$('#ltxt').value.trim()||D_TXT,'');b.textContent=t;b.disabled=false;play(wav(trimSil(f)),null)}catch(e){toast('Lỗi: '+e.message,4500)}finally{preview.busy=false;b.disabled=false;b.textContent=t}});
+  try{const f=await PC.tts(v.name,$('#ltxt').value.trim()||D_TXT,L.pcStyle||'');b.textContent=t;b.disabled=false;play(wav(trimSil(f)),null)}catch(e){toast('Lỗi: '+e.message,4500)}finally{preview.busy=false;b.disabled=false;b.textContent=t}});
  $$('#pclist [data-pu]').forEach(b=>b.onclick=()=>{L.voice='pc:'+vs[+b.dataset.pu].name;saveL();renderVSel();tab('t-doc');toast('Đã chọn giọng '+vs[+b.dataset.pu].name+' ở tab Đọc')});
  $$('#pclist [data-pd]').forEach(b=>b.onclick=async()=>{const v=vs[+b.dataset.pd];if(!(await ask('Xóa giọng trên PC?','Giọng "'+esc(v.name)+'" sẽ được chuyển vào thư mục giong-da-xoa trên PC (vẫn khôi phục được).','Xóa',true)))return;
   try{await PC.post('/delete',{voice:v.name});if(L.voice==='pc:'+v.name){L.voice='af_heart';saveL()}await pcRefresh();toast('Đã chuyển vào giong-da-xoa')}catch(e){toast('Lỗi: '+e.message,4500)}})}
@@ -593,6 +596,7 @@ $('#pcchk').onclick=()=>{$('#pcinfo').innerHTML='<div class="muted small" style=
 $$('[data-pcu]').forEach(b=>b.onclick=()=>{L.pcUrl='http://127.0.0.1:'+b.dataset.pcu;$('#pcurl').value=L.pcUrl;saveL();$('#pcchk').click()});
 $('#pcurl').onchange=()=>{L.pcUrl=$('#pcurl').value.trim();saveL()};
 $('#pcslow').oninput=()=>{L.pcSlow=$('#pcslow').value;saveL()};
+$('#pcstyle').oninput=()=>{L.pcStyle=$('#pcstyle').value;saveL()};
 $('#dins').oninput=()=>{L.dIns=$('#dins').value;saveL()};$('#dtxt').oninput=()=>{L.dTxt=$('#dtxt').value;saveL()};$('#dn').onchange=()=>{L.pcN=+$('#dn').value;saveL()};
 
 // ---------- Chọn giọng ----------
@@ -688,7 +692,7 @@ $('#txt').oninput=()=>{L.txt=$('#txt').value;clearTimeout(saveL._t);saveL._t=set
 $('#go').onclick=generate;
 $('#ver').textContent=APP_VER;
 $('#txt').value=L.txt||'';
-$('#pcurl').value=L.pcUrl;$('#pcslow').value=L.pcSlow;$('#dins').value=L.dIns||E_PROMPT;$('#dtxt').value=L.dTxt||D_TXT;$('#dn').value=String(L.pcN||3);
+$('#pcurl').value=L.pcUrl;$('#pcslow').value=L.pcSlow;$('#pcstyle').value=L.pcStyle||'';$('#dins').value=L.dIns||E_PROMPT;$('#dtxt').value=L.dTxt||D_TXT;$('#dn').value=String(L.pcN||3);
 applyL();initFold();renderVSel();renderMix();renderMy();renderCmpList();renderBase();renderTStat();renderMInfo();pcRefresh(false);
 if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>

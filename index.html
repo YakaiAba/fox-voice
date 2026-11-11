@@ -216,9 +216,10 @@ nav button.on{background:var(--soft);color:var(--c);font-weight:700}
   <button class="sm" data-pcu="8802" style="width:100%;margin-top:8px">Qwen3 giọng có sẵn (Ryan, Aiden) · 8802</button>
   <button class="pri big" id="pcchk" style="margin-top:8px">Kiểm tra kết nối</button>
   <label class="chk"><input type="checkbox" id="pcdn">Lọc ồn nhẹ (giảm tiếng hơi, xì; mặc định bật)</label>
+  <label class="chk"><input type="checkbox" id="pchk">Hậu kỳ khớp giọng E (cắt ồn chỗ nghỉ + chỉnh màu âm giống E; cần máy chủ 1.9; mặc định bật)</label>
   <label>Giọng điệu chung (Qwen3 giọng có sẵn, VoxCPM2; để trống = mặc định)</label>
   <input id="pcstyle" autocomplete="off" placeholder="Warm, excited young documentary narrator, smiling…">
-  <label>Giọng điệu cho đoạn [slow] (Qwen3 giọng có sẵn, VoxCPM2)</label>
+  <label>Giọng điệu cho đoạn [slow] (để trống = khuyên dùng: giữ nguyên giọng, chỉ đọc chậm theo thanh "Đoạn có thẻ [slow]" ở tab Đọc)</label>
   <input id="pcslow" autocomplete="off">
   <div id="pcinfo"></div>
  </div></div>
@@ -278,10 +279,23 @@ nav button.on{background:var(--soft);color:var(--c);font-weight:700}
 
 <script>
 'use strict';
-const APP_VER='1.9 (11/11/2026)';
+const APP_VER='2.1 (11/11/2026)';
 const SR=48000; // 1.9: xuất 48 kHz; Kokoro (24 kHz) được nâng lên 48 kHz
 function up2(a){const n=a.length,o=new Float32Array(n*2),H=16,h=[];for(let k=-H;k<=H;k++){const x=k-0.5,w=0.5+0.5*Math.cos(Math.PI*x/(H+0.5));h.push(Math.sin(Math.PI*x)/(Math.PI*x)*w)}
  for(let i=0;i<n;i++){o[2*i]=a[i];let s=0;for(let k=-H;k<=H;k++){const j=i+k;if(j>=0&&j<n)s+=a[j]*h[k+H]}o[2*i+1]=s}return o}
+// 2.0: kéo chậm giữ nguyên cao độ (WSOLA) cho đoạn [slow] của giọng PC
+function wsola(x0,rate){if(!(rate>0)||Math.abs(rate-1)<0.01||x0.length<4096)return x0;const N=2048,Hs=1024,tol=512,w=new Float32Array(N);const x=new Float32Array(x0.length+2*N+2*tol);x.set(x0,0);const outN=Math.round(x0.length/rate);for(let i=0;i<N;i++)w[i]=0.5-0.5*Math.cos(2*Math.PI*i/N);
+ const Ha=Hs*rate,nF=Math.floor((x.length-N-tol)/Ha);if(nF<2)return x0;const y=new Float32Array(nF*Hs+N);let prev=0;
+ for(let i=0;i<N;i++)y[i]=x[i]*(i<N/2?1:w[i]);
+ for(let k=1;k<nF;k++){const nom=Math.round(k*Ha),nat=prev+Hs;let best=nom,bv=-Infinity;
+  for(let d=-tol;d<=tol;d+=8){const st=nom+d;if(st<0||st+N>x.length)continue;let c=0;for(let i=0;i<N;i+=4)c+=x[st+i]*(x[nat+i]||0);if(c>bv){bv=c;best=st}}
+  const o=k*Hs;for(let i=0;i<N;i++)y[o+i]+=x[best+i]*w[i];prev=best}
+ return y.subarray(0,Math.min(outN,y.length))}
+function actRms(a){const fr=Math.round(0.02*SR),r=[];for(let i=0;i+fr<=a.length;i+=fr){let s=0;for(let k=i;k<i+fr;k++)s+=a[k]*a[k];r.push(s/fr)}if(!r.length)return 0;const so=r.slice().sort((p,q)=>p-q),th=so[Math.floor(so.length*0.95)]*0.05;const v=r.filter(x=>x>th);return Math.sqrt(v.reduce((p,q)=>p+q,0)/Math.max(1,v.length))}
+function normLevel(a,db=-20){const r=actRms(a);if(!r)return a;let g=Math.pow(10,db/20)/r;let pk=0;for(let i=0;i<a.length;i++)pk=Math.max(pk,Math.abs(a[i]));if(pk*g>0.98)g=0.98/pk;const o=new Float32Array(a.length);for(let i=0;i<a.length;i++)o[i]=a[i]*g;return o}
+// 2.1: hậu kỳ trên máy chủ PC cho cả bài một lần, rồi chia lại theo đoạn
+async function hauKy(out){if(!out.length)return out;const lens=out.map(o=>o.f.length);const cat=concat(out.map(o=>o.f));
+ try{const p=await PC.hauky(cat);let k=0;out.forEach((o,i)=>{o.f=p.slice(k,k+lens[i]);k+=lens[i]})}catch(e){toast('Bỏ qua hậu kỳ: '+e.message)}return out}
 function toSR(a,sr){if(!sr||sr===SR)return a;if(sr*2===SR)return up2(a);const n=Math.round(a.length*SR/sr),o=new Float32Array(n),r=sr/SR;for(let i=0;i<n;i++){const x=i*r,j=Math.floor(x),f=x-j;o[i]=(a[j]||0)*(1-f)+(a[j+1]||0)*f}return o}
 const MODEL_ID='onnx-community/Kokoro-82M-v1.0-ONNX';
 const KOKORO_URLS=['https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js','https://unpkg.com/kokoro-js@1.2.1/dist/kokoro.web.js'];
@@ -313,7 +327,7 @@ const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='M
 function loadJ(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v&&typeof v==='object'?v:d}catch(e){return d}}
 const D=Object.assign({voices:[],fav:[]},loadJ(K_DATA,{}));
 if(!Array.isArray(D.voices))D.voices=[];if(!Array.isArray(D.fav))D.fav=[];
-const L=Object.assign({voice:'af_heart',speed:1,p1:250,p2:600,p3:1000,trim:true,fmt:'wav',mode:'each',fname:'voice',dev:'auto',hmax:20,txt:'',fold:{},slowF:0.85,cmp:{},pcUrl:'http://127.0.0.1:8800',pcSlow:'slower, softer, solemn and hushed',pcStyle:'',pcDn:true,pcN:3,dIns:'',dTxt:''},loadJ(K_LOCAL,{}));
+const L=Object.assign({voice:'af_heart',speed:1,p1:250,p2:600,p3:1000,trim:true,fmt:'wav',mode:'each',fname:'voice',dev:'auto',hmax:20,txt:'',fold:{},slowF:0.85,cmp:{},pcUrl:'http://127.0.0.1:8800',pcSlow:'',pcStyle:'',pcDn:true,pcN:3,dIns:'',dTxt:''},loadJ(K_LOCAL,{}));
 function saveD(){try{localStorage.setItem(K_DATA,JSON.stringify(D))}catch(e){toast('Không lưu được: bộ nhớ trình duyệt đầy')}}
 function saveL(){try{localStorage.setItem(K_LOCAL,JSON.stringify(L))}catch(e){}}
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
@@ -446,7 +460,7 @@ async function renderScript(segs,vo,speed,P,onProg){const total=segs.reduce((a,g
  for(let si=0;si<segs.length&&!G.cancel;si++){const g=segs[si],sp=g.slow?speed*g.slow:speed,pm=g.slow?1.5:1,parts=[];
   for(let li=0;li<g.lines.length&&!G.cancel;li++){
    Engine.onSent=(i,n)=>onProg&&onProg((done+(i+1)/n)/total,si,segs.length,i,n);
-   let r;if(vo.pc){onProg&&onProg((done+0.5)/total,si,segs.length,0,1);const a=await PC.tts(vo.pc,g.lines[li],g.slow?L.pcSlow:(L.pcStyle||''));r={audios:[a],cancelled:false}}
+   let r;if(vo.pc){onProg&&onProg((done+0.5)/total,si,segs.length,0,1);const st=g.slow?(L.pcSlow||''):(L.pcStyle||'');let a=await PC.tts(vo.pc,g.lines[li],st);if(g.slow&&!L.pcSlow)a=wsola(P.trim?trimSil(a):a,g.slow);a=normLevel(a);r={audios:[a],cancelled:false}}
    else r=await Engine.synth(g.lines[li],vo.mix,sp);
    r.audios.forEach((x,k)=>{if(k)parts.push(sil(P.p1*pm));parts.push(P.trim?trimSil(x):x)});
    if(li<g.lines.length-1)parts.push(sil(P.p2*pm));
@@ -468,6 +482,7 @@ async function generate(){if(G.busy)return toast('Đang tạo, chờ xong hoặc
  begin(RB);$('#res').innerHTML='';const t0=performance.now();
  try{if(!spec.pc)await Engine.load();G.started=true;
   const out=await renderScript(segs,spec,speed,P,(f,si,ns,i,n)=>progText(f,t0,`Đoạn ${si+1}/${ns} · câu ${i+1}/${n}`));
+  if(spec.pc&&L.pcHk!==false&&out.length){progText(0.99,t0,'Hậu kỳ khớp giọng E…');await hauKy(out)}
   const el=(performance.now()-t0)/1000;
   if(!out.length){$('#prog').style.display='none';toast('Đã dừng, chưa có đoạn nào');return}
   const audioSec=out.reduce((x,o)=>x+o.f.length/SR,0);
@@ -501,7 +516,7 @@ async function runCompare(){if(G.busy)return toast('Đang tạo, chờ xong ho�
  try{if(items.some(it=>!it.pc))await Engine.load();G.started=true;
   for(let k=0;k<items.length&&!G.cancel;k++){const it=items[k],sp=cmpState(it).speed;
    const out=await renderScript(segs,it,sp,P,(f,si,ns)=>progText((k+f)/items.length,t0,`Giọng ${k+1}/${items.length}: ${it.name} · đoạn ${si+1}/${ns}`));
-   if(!out.length)break;const f=out.length>1?mergeOut(out,P.p3):out[0].f;
+   if(!out.length)break;if(it.pc&&L.pcHk!==false)await hauKy(out);const f=out.length>1?mergeOut(out,P.p3):out[0].f;
    CR.push({it,sp,blob:wav(f),m:measure(f,out.reduce((x,o)=>x+countW(o.text),0)),partial:G.cancel});renderCmp()}
   $(CB.title).textContent=G.cancel?'Đã dừng':'Xong';$(CB.bar).style.width='100%';$(CB.info).textContent=`${CR.length} giọng trong ${fmtT((performance.now()-t0)/1000)}`}
  catch(e){$(CB.title).textContent='Lỗi';$(CB.info).innerHTML='<span style="color:var(--bad)">'+esc(e.message)+'</span>'}
@@ -561,6 +576,9 @@ const PC={st:null,
  async status(ms=10000){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);
   try{const r=await fetch(this.url()+'/status',{cache:'no-store',signal:c.signal});const j=await r.json();if(!j||j.app!=='fox-voice-pc')throw new Error('Địa chỉ này không phải máy chủ Fox-voice PC');this.st=j;return j}
   catch(e){this.st=null;throw new Error(e.name==='AbortError'?'Không phản hồi (quá thời gian chờ)':e.message)}finally{clearTimeout(t)}},
+ async hauky(f){let r;try{r=await fetch(this.url()+'/hauky?sr='+SR+'&hoso=E',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:f})}catch(e){throw new Error('Không kết nối được máy chủ PC')}
+  if(r.status===404)throw new Error('Máy chủ PC cần bản 1.9 trở lên để hậu kỳ');if(!r.ok){let m='HTTP '+r.status;try{m=(await r.json()).error||m}catch(e){}throw new Error(m)}
+  return toSR(new Float32Array(await r.arrayBuffer()),+r.headers.get('X-Sample-Rate')||SR)},
  async post(path,body){let r;
   try{r=await fetch(this.url()+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})}
   catch(e){throw new Error('Không kết nối được máy chủ PC ('+this.url()+'). Mở ChayQwen.bat, ChayVoxCPM.bat hoặc ChayQwenCoSan.bat rồi thử lại.')}
@@ -604,7 +622,7 @@ $$('[data-pcu]').forEach(b=>b.onclick=()=>{L.pcUrl='http://127.0.0.1:'+b.dataset
 $('#pcurl').onchange=()=>{L.pcUrl=$('#pcurl').value.trim();saveL()};
 $('#pcslow').oninput=()=>{L.pcSlow=$('#pcslow').value;saveL()};
 $('#pcstyle').oninput=()=>{L.pcStyle=$('#pcstyle').value;saveL()};
-$('#pcdn').onchange=()=>{L.pcDn=$('#pcdn').checked;saveL()};
+$('#pcdn').onchange=()=>{L.pcDn=$('#pcdn').checked;saveL()};$('#pchk').onchange=()=>{L.pcHk=$('#pchk').checked;saveL()};
 $('#dins').oninput=()=>{L.dIns=$('#dins').value;saveL()};$('#dtxt').oninput=()=>{L.dTxt=$('#dtxt').value;saveL()};$('#dn').onchange=()=>{L.pcN=+$('#dn').value;saveL()};
 
 // ---------- Chọn giọng ----------
@@ -702,7 +720,7 @@ $('#txt').oninput=()=>{L.txt=$('#txt').value;clearTimeout(saveL._t);saveL._t=set
 $('#go').onclick=generate;
 $('#ver').textContent=APP_VER;
 $('#txt').value=L.txt||'';
-$('#pcurl').value=L.pcUrl;$('#pcslow').value=L.pcSlow;$('#pcstyle').value=L.pcStyle||'';$('#pcdn').checked=L.pcDn!==false;$('#dins').value=L.dIns||E_PROMPT;$('#dtxt').value=L.dTxt||D_TXT;$('#dn').value=String(L.pcN||3);
+$('#pcurl').value=L.pcUrl;$('#pcslow').value=L.pcSlow;$('#pcstyle').value=L.pcStyle||'';$('#pcdn').checked=L.pcDn!==false;$('#pchk').checked=L.pcHk!==false;$('#dins').value=L.dIns||E_PROMPT;$('#dtxt').value=L.dTxt||D_TXT;$('#dn').value=String(L.pcN||3);
 applyL();initFold();renderVSel();renderMix();renderMy();renderCmpList();renderBase();renderTStat();renderMInfo();pcRefresh(false);
 if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>

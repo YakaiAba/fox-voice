@@ -278,8 +278,11 @@ nav button.on{background:var(--soft);color:var(--c);font-weight:700}
 
 <script>
 'use strict';
-const APP_VER='1.8 (11/11/2026)';
-const SR=24000;
+const APP_VER='1.9 (11/11/2026)';
+const SR=48000; // 1.9: xuất 48 kHz; Kokoro (24 kHz) được nâng lên 48 kHz
+function up2(a){const n=a.length,o=new Float32Array(n*2),H=16,h=[];for(let k=-H;k<=H;k++){const x=k-0.5,w=0.5+0.5*Math.cos(Math.PI*x/(H+0.5));h.push(Math.sin(Math.PI*x)/(Math.PI*x)*w)}
+ for(let i=0;i<n;i++){o[2*i]=a[i];let s=0;for(let k=-H;k<=H;k++){const j=i+k;if(j>=0&&j<n)s+=a[j]*h[k+H]}o[2*i+1]=s}return o}
+function toSR(a,sr){if(!sr||sr===SR)return a;if(sr*2===SR)return up2(a);const n=Math.round(a.length*SR/sr),o=new Float32Array(n),r=sr/SR;for(let i=0;i<n;i++){const x=i*r,j=Math.floor(x),f=x-j;o[i]=(a[j]||0)*(1-f)+(a[j+1]||0)*f}return o}
 const MODEL_ID='onnx-community/Kokoro-82M-v1.0-ONNX';
 const KOKORO_URLS=['https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js','https://unpkg.com/kokoro-js@1.2.1/dist/kokoro.web.js'];
 const LAME_URLS=['https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js','https://unpkg.com/lamejs@1.2.1/lame.min.js'];
@@ -377,7 +380,7 @@ const Engine={w:null,ready:false,info:null,loading:null,seq:0,pend:new Map(),onS
    .catch(e=>{this.loading=null;setMStat('Lỗi tải mô hình');renderMInfo(e.message);throw e});
   renderMInfo();return this.loading},
  cancel(){if(window.FOXV_FAKE){this._cancel=true;return}if(this.w)this.w.postMessage({type:'cancel'})},
- async synth(text,mix,speed){await this.load();return this.call('synth',{text,mix,speed})}};
+ async synth(text,mix,speed){await this.load();const r=await this.call('synth',{text,mix,speed});if(r&&r.audios)r.audios=r.audios.map(x=>toSR(x,24000));return r}};
 const MP={files:{}};
 function onModelProgress(p){if(!p||!p.file)return;if(p.status==='progress'||p.status==='done'){const f=MP.files[p.file]||(MP.files[p.file]={l:0,t:0});if(p.total)f.t=p.total;f.l=p.status==='done'?(f.t||f.l):(p.loaded||0)}
  const fs=Object.values(MP.files),t=fs.reduce((a,f)=>a+f.t,0),l=fs.reduce((a,f)=>a+f.l,0);
@@ -562,8 +565,8 @@ const PC={st:null,
   try{r=await fetch(this.url()+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})}
   catch(e){throw new Error('Không kết nối được máy chủ PC ('+this.url()+'). Mở ChayQwen.bat, ChayVoxCPM.bat hoặc ChayQwenCoSan.bat rồi thử lại.')}
   if(!r.ok){let m='HTTP '+r.status;try{m=(await r.json()).error||m}catch(e){}throw new Error(m)}return r},
- async tts(voice,text,style){const r=await this.post('/tts',{voice,text,style,denoise:L.pcDn!==false});return new Float32Array(await r.arrayBuffer())},
- async design(instruct,text,seed){const r=await this.post('/design',{instruct,text,seed});const f=new Float32Array(await r.arrayBuffer());return{f,id:r.headers.get('X-Design-Id'),seed:+r.headers.get('X-Seed'),sec:+r.headers.get('X-Seconds')}}};
+ async tts(voice,text,style){const r=await this.post('/tts',{voice,text,style,denoise:L.pcDn!==false,sr:SR});return toSR(new Float32Array(await r.arrayBuffer()),+r.headers.get('X-Sample-Rate')||24000)},
+ async design(instruct,text,seed){const r=await this.post('/design',{instruct,text,seed,sr:SR});const f=toSR(new Float32Array(await r.arrayBuffer()),+r.headers.get('X-Sample-Rate')||24000);return{f,id:r.headers.get('X-Design-Id'),seed:+r.headers.get('X-Seed'),sec:+r.headers.get('X-Seconds')}}};
 const engName=e=>({qwen:'Qwen3 thiết kế giọng',qwenc:'Qwen3 giọng có sẵn',vox:'VoxCPM2',fake:'Bộ đọc giả (kiểm tra)',fakec:'Bộ đọc giả có sẵn (kiểm tra)'}[e]||e);
 function pcErrHtml(m){return'<div class="err">'+esc(m)+'<br>Kiểm tra: (1) cửa sổ ChayQwen.bat hoặc ChayVoxCPM.bat đang mở và không báo lỗi; (2) địa chỉ đúng cổng (Qwen3 thiết kế 8800, VoxCPM2 8801, Qwen3 giọng có sẵn 8802); (3) nếu Chrome hỏi "cho phép truy cập thiết bị trong mạng cục bộ", bấm Cho phép; (4) mở bằng Chrome hoặc Edge trên chính máy tính đó.</div>'}
 async function pcRefresh(show){const box=$('#pcinfo'),st=$('#pcst');

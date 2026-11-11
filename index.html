@@ -216,6 +216,7 @@ nav button.on{background:var(--soft);color:var(--c);font-weight:700}
   <button class="sm" data-pcu="8802" style="width:100%;margin-top:8px">Qwen3 giọng có sẵn (Ryan, Aiden) · 8802</button>
   <button class="pri big" id="pcchk" style="margin-top:8px">Kiểm tra kết nối</button>
   <label class="chk"><input type="checkbox" id="pcdn">Lọc ồn nhẹ (giảm tiếng hơi, xì; mặc định bật)</label>
+  <label class="chk"><input type="checkbox" id="pcck">Tự rà lỗi chữ (máy nghe lại từng câu, câu sai tự đọc lại tối đa 2 lần; cần chạy CaiKiemTra.bat 1 lần; mặc định bật)</label>
   <label class="chk"><input type="checkbox" id="pchk">Hậu kỳ khớp giọng E (cắt ồn chỗ nghỉ + chỉnh màu âm giống E; cần máy chủ 1.9; mặc định bật)</label>
   <label>Giọng điệu chung (Qwen3 giọng có sẵn, VoxCPM2; để trống = mặc định)</label>
   <input id="pcstyle" autocomplete="off" placeholder="Warm, excited young documentary narrator, smiling…">
@@ -279,7 +280,7 @@ nav button.on{background:var(--soft);color:var(--c);font-weight:700}
 
 <script>
 'use strict';
-const APP_VER='2.1 (11/11/2026)';
+const APP_VER='2.2 (11/11/2026)';
 const SR=48000; // 1.9: xuất 48 kHz; Kokoro (24 kHz) được nâng lên 48 kHz
 function up2(a){const n=a.length,o=new Float32Array(n*2),H=16,h=[];for(let k=-H;k<=H;k++){const x=k-0.5,w=0.5+0.5*Math.cos(Math.PI*x/(H+0.5));h.push(Math.sin(Math.PI*x)/(Math.PI*x)*w)}
  for(let i=0;i<n;i++){o[2*i]=a[i];let s=0;for(let k=-H;k<=H;k++){const j=i+k;if(j>=0&&j<n)s+=a[j]*h[k+H]}o[2*i+1]=s}return o}
@@ -457,16 +458,24 @@ function progText(f,t0,lab){const b=G.box;$(b.bar).style.width=(Math.min(1,f)*10
 function end(){G.busy=false;$('#go').disabled=$('#cgo').disabled=false;Engine.onSent=null;if(G.box)$(G.box.stop).style.visibility='hidden'}
 const curP=()=>({p1:+$('#p1').value,p2:+$('#p2').value,p3:+$('#p3').value,trim:$('#trim').checked});
 async function renderScript(segs,vo,speed,P,onProg){const total=segs.reduce((a,g)=>a+g.lines.length,0);let done=0;const out=[];
- for(let si=0;si<segs.length&&!G.cancel;si++){const g=segs[si],sp=g.slow?speed*g.slow:speed,pm=g.slow?1.5:1,parts=[];
+ for(let si=0;si<segs.length&&!G.cancel;si++){const g=segs[si],sp=g.slow?speed*g.slow:speed,pm=g.slow?1.5:1,parts=[],loi=[];
   for(let li=0;li<g.lines.length&&!G.cancel;li++){
    Engine.onSent=(i,n)=>onProg&&onProg((done+(i+1)/n)/total,si,segs.length,i,n);
-   let r;if(vo.pc){onProg&&onProg((done+0.5)/total,si,segs.length,0,1);const st=g.slow?(L.pcSlow||''):(L.pcStyle||'');let a=await PC.tts(vo.pc,g.lines[li],st);if(g.slow&&!L.pcSlow)a=wsola(P.trim?trimSil(a):a,g.slow);a=normLevel(a);r={audios:[a],cancelled:false}}
+   let r;if(vo.pc){onProg&&onProg((done+0.5)/total,si,segs.length,0,1);const x=await pcLine(vo,g,g.lines[li],P,()=>onProg&&onProg((done+0.5)/total,si,segs.length,0,1));if(x.loi)loi.push(x.loi);r={audios:[x.a],cancelled:false}}
    else r=await Engine.synth(g.lines[li],vo.mix,sp);
    r.audios.forEach((x,k)=>{if(k)parts.push(sil(P.p1*pm));parts.push(P.trim?trimSil(x):x)});
    if(li<g.lines.length-1)parts.push(sil(P.p2*pm));
    done++;if(r.cancelled)G.cancel=true}
-  if(parts.length)out.push({i:si+1,text:g.lines.join(' '),slow:g.slow,f:concat(parts)})}
+  if(parts.length)out.push({i:si+1,text:g.lines.join(' '),lines:g.lines.slice(),slow:g.slow,loi,f:concat(parts)})}
  Engine.onSent=null;return out}
+// 2.2: đọc 1 câu bằng giọng PC; nếu bật "Tự rà lỗi chữ", máy nghe lại, sai thì đọc lại (tối đa 2 lần, seed khác) và giữ bản ít lỗi nhất
+async function pcLine(vo,g,line,P,note,seed){const st=g.slow?(L.pcSlow||''):(L.pcStyle||'');
+ const one=async sd=>{let a=await PC.tts(vo.pc,line,st,sd);if(g.slow&&!L.pcSlow)a=wsola(P.trim?trimSil(a):a,g.slow);return normLevel(a)};
+ let a=await one(seed);const chk=L.pcCheck!==false&&PC.st&&PC.st.kiem_tra;if(!chk)return{a};
+ let k=await PC.kiemtra(a,line);if(!k||k.dung)return{a};let best={a,k};
+ for(let t=1;t<=2&&!G.cancel;t++){note&&note();const a2=await one(1+Math.floor(Math.random()*999999));const k2=await PC.kiemtra(a2,line);
+  if(k2&&k2.dung)return{a:a2};if(k2&&k2.loi.length<best.k.loi.length)best={a:a2,k:k2}}
+ return{a:best.a,loi:{cau:line,loi:best.k.loi}}}
 function mergeOut(out,p3){const m=[];out.forEach((o,k)=>{if(k)m.push(sil(o.slow||out[k-1].slow?p3*1.5:p3));m.push(o.f)});return concat(m)}
 function measure(f,words){const fr=Math.round(0.02*SR),n=Math.floor(f.length/fr),r=new Float32Array(n);
  for(let i=0;i<n;i++){let s=0;for(let k=i*fr;k<(i+1)*fr;k++)s+=f[k]*f[k];r[i]=Math.sqrt(s/fr)}
@@ -487,7 +496,7 @@ async function generate(){if(G.busy)return toast('Đang tạo, chờ xong hoặc
   if(!out.length){$('#prog').style.display='none';toast('Đã dừng, chưa có đoạn nào');return}
   const audioSec=out.reduce((x,o)=>x+o.f.length/SR,0);
   G.last={id:uid(),t:Date.now(),voice:spec.name,voiceKey:L.voice,mix:spec.mix,speed,p:[P.p1,P.p2,P.p3],txt:text,partial:G.cancel,el,
-   segs:out.map(o=>({i:o.i,text:o.text,slow:o.slow,dur:o.f.length/SR,blob:wav(o.f)}))};
+   segs:out.map(o=>({i:o.i,text:o.text,lines:o.lines,slow:o.slow,loi:o.loi||[],dur:o.f.length/SR,blob:wav(o.f)}))};
   if(out.length>1){const mf=mergeOut(out,P.p3);G.last.merged=wav(mf);G.last.dur=mf.length/SR}else G.last.dur=out[0].f.length/SR;
   $('#ptitle').textContent=G.cancel?'Đã dừng giữa chừng':'Xong';$('#pbar').style.width='100%';
   $('#pinfo').textContent=`Tạo ${fmtT(audioSec)} âm thanh trong ${fmtT(el)} (${nf(el/Math.max(audioSec,0.1),2)}× thời gian đọc)`;
@@ -534,7 +543,7 @@ $('#cgo').onclick=runCompare;
 
 function renderResult(h,box=$('#res')){const ext=L.fmt==='mp3'?'mp3':'wav';const multi=h.segs.length>1;
  let s=`<div class="card"><h3 data-ic="✅" style="cursor:default">Kết quả${h.partial?' (chưa đủ)':''}</h3><div class="fb"><div class="muted small">${esc(h.voice)} · ${nf(h.speed,2)}× · ${h.segs.length} đoạn · tổng ${fmtT(h.dur)}</div><div class="list">`;
- h.segs.forEach((g,k)=>{s+=`<div class="it"><div class="tx"><div><b>${String(g.i).padStart(2,'0')}</b> ${esc(g.text)}</div><div class="muted small">${fmtT(g.dur)} · ${fname(g.i)}.${ext}${g.slow?(String(h.voiceKey).startsWith('pc:')?' · đoạn chậm (nghỉ dài hơn)':' · chậm ×'+nf(g.slow,2)):''}</div></div><button class="ic" data-pl="${k}">▶</button><button class="ic" data-dl="${k}">⬇</button></div>`});
+ h.segs.forEach((g,k)=>{s+=`<div class="it"><div class="tx"><div><b>${String(g.i).padStart(2,'0')}</b> ${esc(g.text)}</div><div class="muted small">${fmtT(g.dur)} · ${fname(g.i)}.${ext}${g.slow?(String(h.voiceKey).startsWith('pc:')?' · đoạn chậm (nghỉ dài hơn)':' · chậm ×'+nf(g.slow,2)):''}</div>${(g.loi&&g.loi.length)?`<div class="small" style="color:var(--bad)">⚠ Máy nghe chưa khớp: ${esc(g.loi.map(x=>x.loi.join(', ')).join(' | '))}. Nghe lại; sai thì bấm ↻</div>`:''}</div>${String(h.voiceKey).startsWith('pc:')?`<button class="ic" data-rg="${k}" title="Đọc lại đoạn này">↻</button>`:''}<button class="ic" data-pl="${k}">▶</button><button class="ic" data-dl="${k}">⬇</button></div>`});
  s+='</div><div class="row" style="margin-top:8px">';
  if(L.mode!=='merge'&&multi)s+='<button class="pri" data-z="1">⬇ Tải tất cả (.zip)</button>';
  if((L.mode!=='each'||!multi)&&h.merged)s+=`<button class="pri" data-m="1">⬇ File gộp (${fmtT(h.dur)})</button>`;
@@ -542,10 +551,21 @@ function renderResult(h,box=$('#res')){const ext=L.fmt==='mp3'?'mp3':'wav';const
  if(h.merged&&L.mode!=='each')s+=`<button data-mp="1">▶ Nghe</button>`;
  s+='</div></div></div>';box.innerHTML=s;
  box.querySelectorAll('[data-pl]').forEach(b=>b.onclick=()=>play(h.segs[+b.dataset.pl].blob,b));
+ box.querySelectorAll('[data-rg]').forEach(b=>b.onclick=()=>redoSeg(h,+b.dataset.rg,b,box));
  box.querySelectorAll('[data-dl]').forEach(b=>b.onclick=()=>exportOne(h,+b.dataset.dl));
  box.querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>exportZip(h,b));
  box.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>exportMerged(h,b));
  box.querySelectorAll('[data-mp]').forEach(b=>b.onclick=()=>play(h.merged,b))}
+// 2.2: đọc lại 1 đoạn (giọng PC) với cách đọc ngẫu nhiên khác, rồi ghép lại cả bài
+async function redoSeg(h,k,btn,box){if(G.busy)return toast('Đang bận, chờ xong rồi thử lại');const g=h.segs[k],pc=String(h.voiceKey).replace(/^pc:/,'');
+ const P={p1:h.p[0],p2:h.p[1],p3:h.p[2],trim:true},lines=g.lines||[g.text];btn.disabled=true;btn.textContent='…';G.busy=true;G.cancel=false;
+ try{if(!PC.st)await PC.status();const parts=[],loi=[];const pm=g.slow?1.5:1;
+  for(let li=0;li<lines.length;li++){const x=await pcLine({pc},{slow:g.slow},lines[li],P,null,1+Math.floor(Math.random()*999999));if(x.loi)loi.push(x.loi);parts.push(P.trim?trimSil(x.a):x.a);if(li<lines.length-1)parts.push(sil(P.p2*pm))}
+  let f=concat(parts);if(L.pcHk!==false){const o=[{f}];await hauKy(o);f=o[0].f}
+  g.blob=wav(f);g.dur=f.length/SR;g.loi=loi;
+  if(h.segs.length>1){const all=[];for(const x of h.segs)all.push({f:await wavToF32(x.blob),slow:x.slow});const mf=mergeOut(all,P.p3);h.merged=wav(mf);h.dur=mf.length/SR}else h.dur=g.dur;
+  await saveHist(h);renderResult(h,box);toast('Đã đọc lại đoạn '+String(g.i).padStart(2,'0')+(loi.length?' (máy vẫn nghe chưa khớp, nghe lại)':''),3500)}
+ catch(e){toast('Lỗi: '+e.message,4000);btn.disabled=false;btn.textContent='↻'}finally{G.busy=false}}
 async function enc(blob){if(L.fmt!=='mp3')return{blob,ext:'wav'};try{return{blob:await mp3(await wavToF32(blob)),ext:'mp3'}}catch(e){toast('Không tải được bộ mã hóa MP3, xuất WAV thay thế',3500);return{blob,ext:'wav'}}}
 async function busyBtn(b,fn){const t=b&&b.textContent;if(b){b.disabled=true;b.textContent='Đang xử lý…'}try{await fn()}finally{if(b){b.disabled=false;b.textContent=t}}}
 async function exportOne(h,k){const g=h.segs[k];const r=await enc(g.blob);await deliver(r.blob,fname(g.i)+'.'+r.ext)}
@@ -576,6 +596,8 @@ const PC={st:null,
  async status(ms=10000){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);
   try{const r=await fetch(this.url()+'/status',{cache:'no-store',signal:c.signal});const j=await r.json();if(!j||j.app!=='fox-voice-pc')throw new Error('Địa chỉ này không phải máy chủ Fox-voice PC');this.st=j;return j}
   catch(e){this.st=null;throw new Error(e.name==='AbortError'?'Không phản hồi (quá thời gian chờ)':e.message)}finally{clearTimeout(t)}},
+ async kiemtra(f,text){let r;try{r=await fetch(this.url()+'/kiemtra?sr='+SR+'&text='+encodeURIComponent(text),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:f})}catch(e){return null}
+  if(!r.ok)return null;try{return await r.json()}catch(e){return null}},
  async hauky(f){let r;try{r=await fetch(this.url()+'/hauky?sr='+SR+'&hoso=E',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:f})}catch(e){throw new Error('Không kết nối được máy chủ PC')}
   if(r.status===404)throw new Error('Máy chủ PC cần bản 1.9 trở lên để hậu kỳ');if(!r.ok){let m='HTTP '+r.status;try{m=(await r.json()).error||m}catch(e){}throw new Error(m)}
   return toSR(new Float32Array(await r.arrayBuffer()),+r.headers.get('X-Sample-Rate')||SR)},
@@ -583,7 +605,7 @@ const PC={st:null,
   try{r=await fetch(this.url()+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})}
   catch(e){throw new Error('Không kết nối được máy chủ PC ('+this.url()+'). Mở ChayQwen.bat, ChayVoxCPM.bat hoặc ChayQwenCoSan.bat rồi thử lại.')}
   if(!r.ok){let m='HTTP '+r.status;try{m=(await r.json()).error||m}catch(e){}throw new Error(m)}return r},
- async tts(voice,text,style){const r=await this.post('/tts',{voice,text,style,denoise:L.pcDn!==false,sr:SR});return toSR(new Float32Array(await r.arrayBuffer()),+r.headers.get('X-Sample-Rate')||24000)},
+ async tts(voice,text,style,seed){const b={voice,text,style,denoise:L.pcDn!==false,sr:SR};if(seed)b.seed=seed;const r=await this.post('/tts',b);return toSR(new Float32Array(await r.arrayBuffer()),+r.headers.get('X-Sample-Rate')||24000)},
  async design(instruct,text,seed){const r=await this.post('/design',{instruct,text,seed,sr:SR});const f=toSR(new Float32Array(await r.arrayBuffer()),+r.headers.get('X-Sample-Rate')||24000);return{f,id:r.headers.get('X-Design-Id'),seed:+r.headers.get('X-Seed'),sec:+r.headers.get('X-Seconds')}}};
 const engName=e=>({qwen:'Qwen3 thiết kế giọng',qwenc:'Qwen3 giọng có sẵn',vox:'VoxCPM2',fake:'Bộ đọc giả (kiểm tra)',fakec:'Bộ đọc giả có sẵn (kiểm tra)'}[e]||e);
 function pcErrHtml(m){return'<div class="err">'+esc(m)+'<br>Kiểm tra: (1) cửa sổ ChayQwen.bat hoặc ChayVoxCPM.bat đang mở và không báo lỗi; (2) địa chỉ đúng cổng (Qwen3 thiết kế 8800, VoxCPM2 8801, Qwen3 giọng có sẵn 8802); (3) nếu Chrome hỏi "cho phép truy cập thiết bị trong mạng cục bộ", bấm Cho phép; (4) mở bằng Chrome hoặc Edge trên chính máy tính đó.</div>'}
@@ -622,7 +644,7 @@ $$('[data-pcu]').forEach(b=>b.onclick=()=>{L.pcUrl='http://127.0.0.1:'+b.dataset
 $('#pcurl').onchange=()=>{L.pcUrl=$('#pcurl').value.trim();saveL()};
 $('#pcslow').oninput=()=>{L.pcSlow=$('#pcslow').value;saveL()};
 $('#pcstyle').oninput=()=>{L.pcStyle=$('#pcstyle').value;saveL()};
-$('#pcdn').onchange=()=>{L.pcDn=$('#pcdn').checked;saveL()};$('#pchk').onchange=()=>{L.pcHk=$('#pchk').checked;saveL()};
+$('#pcdn').onchange=()=>{L.pcDn=$('#pcdn').checked;saveL()};$('#pchk').onchange=()=>{L.pcHk=$('#pchk').checked;saveL()};$('#pcck').onchange=()=>{L.pcCheck=$('#pcck').checked;saveL()};
 $('#dins').oninput=()=>{L.dIns=$('#dins').value;saveL()};$('#dtxt').oninput=()=>{L.dTxt=$('#dtxt').value;saveL()};$('#dn').onchange=()=>{L.pcN=+$('#dn').value;saveL()};
 
 // ---------- Chọn giọng ----------
@@ -720,7 +742,7 @@ $('#txt').oninput=()=>{L.txt=$('#txt').value;clearTimeout(saveL._t);saveL._t=set
 $('#go').onclick=generate;
 $('#ver').textContent=APP_VER;
 $('#txt').value=L.txt||'';
-$('#pcurl').value=L.pcUrl;$('#pcslow').value=L.pcSlow;$('#pcstyle').value=L.pcStyle||'';$('#pcdn').checked=L.pcDn!==false;$('#pchk').checked=L.pcHk!==false;$('#dins').value=L.dIns||E_PROMPT;$('#dtxt').value=L.dTxt||D_TXT;$('#dn').value=String(L.pcN||3);
+$('#pcurl').value=L.pcUrl;$('#pcslow').value=L.pcSlow;$('#pcstyle').value=L.pcStyle||'';$('#pcdn').checked=L.pcDn!==false;$('#pchk').checked=L.pcHk!==false;$('#pcck').checked=L.pcCheck!==false;$('#dins').value=L.dIns||E_PROMPT;$('#dtxt').value=L.dTxt||D_TXT;$('#dn').value=String(L.pcN||3);
 applyL();initFold();renderVSel();renderMix();renderMy();renderCmpList();renderBase();renderTStat();renderMInfo();pcRefresh(false);
 if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>

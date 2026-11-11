@@ -215,6 +215,7 @@ nav button.on{background:var(--soft);color:var(--c);font-weight:700}
   <div class="row" style="margin-top:8px"><button class="sm" data-pcu="8800">Qwen3 thiết kế · 8800</button><button class="sm" data-pcu="8801">VoxCPM2 · 8801</button></div>
   <button class="sm" data-pcu="8802" style="width:100%;margin-top:8px">Qwen3 giọng có sẵn (Ryan, Aiden) · 8802</button>
   <button class="pri big" id="pcchk" style="margin-top:8px">Kiểm tra kết nối</button>
+  <label class="chk"><input type="checkbox" id="pcdn">Lọc ồn nhẹ (giảm tiếng hơi, xì; mặc định bật)</label>
   <label>Giọng điệu chung (Qwen3 giọng có sẵn, VoxCPM2; để trống = mặc định)</label>
   <input id="pcstyle" autocomplete="off" placeholder="Warm, excited young documentary narrator, smiling…">
   <label>Giọng điệu cho đoạn [slow] (Qwen3 giọng có sẵn, VoxCPM2)</label>
@@ -277,7 +278,7 @@ nav button.on{background:var(--soft);color:var(--c);font-weight:700}
 
 <script>
 'use strict';
-const APP_VER='1.7 (11/11/2026)';
+const APP_VER='1.8 (11/11/2026)';
 const SR=24000;
 const MODEL_ID='onnx-community/Kokoro-82M-v1.0-ONNX';
 const KOKORO_URLS=['https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js','https://unpkg.com/kokoro-js@1.2.1/dist/kokoro.web.js'];
@@ -309,7 +310,7 @@ const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='M
 function loadJ(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v&&typeof v==='object'?v:d}catch(e){return d}}
 const D=Object.assign({voices:[],fav:[]},loadJ(K_DATA,{}));
 if(!Array.isArray(D.voices))D.voices=[];if(!Array.isArray(D.fav))D.fav=[];
-const L=Object.assign({voice:'af_heart',speed:1,p1:250,p2:600,p3:1000,trim:true,fmt:'wav',mode:'each',fname:'voice',dev:'auto',hmax:20,txt:'',fold:{},slowF:0.85,cmp:{},pcUrl:'http://127.0.0.1:8800',pcSlow:'slower, softer, solemn and hushed',pcStyle:'',pcN:3,dIns:'',dTxt:''},loadJ(K_LOCAL,{}));
+const L=Object.assign({voice:'af_heart',speed:1,p1:250,p2:600,p3:1000,trim:true,fmt:'wav',mode:'each',fname:'voice',dev:'auto',hmax:20,txt:'',fold:{},slowF:0.85,cmp:{},pcUrl:'http://127.0.0.1:8800',pcSlow:'slower, softer, solemn and hushed',pcStyle:'',pcDn:true,pcN:3,dIns:'',dTxt:''},loadJ(K_LOCAL,{}));
 function saveD(){try{localStorage.setItem(K_DATA,JSON.stringify(D))}catch(e){toast('Không lưu được: bộ nhớ trình duyệt đầy')}}
 function saveL(){try{localStorage.setItem(K_LOCAL,JSON.stringify(L))}catch(e){}}
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
@@ -561,7 +562,7 @@ const PC={st:null,
   try{r=await fetch(this.url()+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})}
   catch(e){throw new Error('Không kết nối được máy chủ PC ('+this.url()+'). Mở ChayQwen.bat, ChayVoxCPM.bat hoặc ChayQwenCoSan.bat rồi thử lại.')}
   if(!r.ok){let m='HTTP '+r.status;try{m=(await r.json()).error||m}catch(e){}throw new Error(m)}return r},
- async tts(voice,text,style){const r=await this.post('/tts',{voice,text,style});return new Float32Array(await r.arrayBuffer())},
+ async tts(voice,text,style){const r=await this.post('/tts',{voice,text,style,denoise:L.pcDn!==false});return new Float32Array(await r.arrayBuffer())},
  async design(instruct,text,seed){const r=await this.post('/design',{instruct,text,seed});const f=new Float32Array(await r.arrayBuffer());return{f,id:r.headers.get('X-Design-Id'),seed:+r.headers.get('X-Seed'),sec:+r.headers.get('X-Seconds')}}};
 const engName=e=>({qwen:'Qwen3 thiết kế giọng',qwenc:'Qwen3 giọng có sẵn',vox:'VoxCPM2',fake:'Bộ đọc giả (kiểm tra)',fakec:'Bộ đọc giả có sẵn (kiểm tra)'}[e]||e);
 function pcErrHtml(m){return'<div class="err">'+esc(m)+'<br>Kiểm tra: (1) cửa sổ ChayQwen.bat hoặc ChayVoxCPM.bat đang mở và không báo lỗi; (2) địa chỉ đúng cổng (Qwen3 thiết kế 8800, VoxCPM2 8801, Qwen3 giọng có sẵn 8802); (3) nếu Chrome hỏi "cho phép truy cập thiết bị trong mạng cục bộ", bấm Cho phép; (4) mở bằng Chrome hoặc Edge trên chính máy tính đó.</div>'}
@@ -600,6 +601,7 @@ $$('[data-pcu]').forEach(b=>b.onclick=()=>{L.pcUrl='http://127.0.0.1:'+b.dataset
 $('#pcurl').onchange=()=>{L.pcUrl=$('#pcurl').value.trim();saveL()};
 $('#pcslow').oninput=()=>{L.pcSlow=$('#pcslow').value;saveL()};
 $('#pcstyle').oninput=()=>{L.pcStyle=$('#pcstyle').value;saveL()};
+$('#pcdn').onchange=()=>{L.pcDn=$('#pcdn').checked;saveL()};
 $('#dins').oninput=()=>{L.dIns=$('#dins').value;saveL()};$('#dtxt').oninput=()=>{L.dTxt=$('#dtxt').value;saveL()};$('#dn').onchange=()=>{L.pcN=+$('#dn').value;saveL()};
 
 // ---------- Chọn giọng ----------
@@ -697,7 +699,7 @@ $('#txt').oninput=()=>{L.txt=$('#txt').value;clearTimeout(saveL._t);saveL._t=set
 $('#go').onclick=generate;
 $('#ver').textContent=APP_VER;
 $('#txt').value=L.txt||'';
-$('#pcurl').value=L.pcUrl;$('#pcslow').value=L.pcSlow;$('#pcstyle').value=L.pcStyle||'';$('#dins').value=L.dIns||E_PROMPT;$('#dtxt').value=L.dTxt||D_TXT;$('#dn').value=String(L.pcN||3);
+$('#pcurl').value=L.pcUrl;$('#pcslow').value=L.pcSlow;$('#pcstyle').value=L.pcStyle||'';$('#pcdn').checked=L.pcDn!==false;$('#dins').value=L.dIns||E_PROMPT;$('#dtxt').value=L.dTxt||D_TXT;$('#dn').value=String(L.pcN||3);
 applyL();initFold();renderVSel();renderMix();renderMy();renderCmpList();renderBase();renderTStat();renderMInfo();pcRefresh(false);
 if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>

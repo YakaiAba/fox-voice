@@ -468,6 +468,17 @@ async function renderScript(segs,vo,speed,P,onProg){const total=segs.reduce((a,g
    done++;if(r.cancelled)G.cancel=true}
   if(parts.length)out.push({i:si+1,text:g.lines.join(' '),lines:g.lines.slice(),slow:g.slow,loi,f:concat(parts)})}
  Engine.onSent=null;return out}
+
+// 2.3: bỏ báo nhầm khi so chữ (số↔chữ, 's, Anh/Mỹ, tên riêng gần giống)
+const SO={zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90,first:1,second:2,third:3,fourth:4,fifth:5,sixth:6,seventh:7,eighth:8,ninth:9,tenth:10,twentieth:20,thirtieth:30,hundred:100,thousand:1000};
+const DONG={tonnes:'tons',tonne:'ton',metres:'meters',metre:'meter',kilometres:'kilometers',kilometre:'kilometer',colour:'color',honour:'honor',armour:'armor',centre:'center',recognised:'recognized',organised:'organized'};
+function chuan(t){t=String(t).toLowerCase().replace(/[’']s\b/g,'').replace(/[^a-z0-9 ]+/g,' ').replace(/\b(\d+)(st|nd|rd|th)\b/g,'$1').trim();
+ let w=t.split(/\s+/).map(x=>DONG[x]||x),o=[],n=null;
+ for(const x of w){if(x in SO){const v=SO[x];if(n===null)n=v;else if(v===100||v===1000)n*=v;else n+=v}else{if(n!==null){o.push(String(n));n=null}if(x!=='and'&&x!=='a')o.push(x)}}
+ if(n!==null)o.push(String(n));return o.join(' ')}
+function lev(a,b){const m=a.length,n=b.length,d=Array.from({length:m+1},(_,i)=>[i]);for(let j=1;j<=n;j++)d[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[m][n]}
+function giongNhau(x){const p=String(x).split(/\s*(?:→|->)\s*/);if(p.length!==2)return false;const a=chuan(p[0]),b=chuan(p[1]);if(a===b)return true;
+ const A=a.replace(/ /g,''),B=b.replace(/ /g,'');return A.length>=6&&lev(A,B)<=Math.max(2,Math.round(A.length*0.25))}
 // 2.2: đọc 1 câu bằng giọng PC; nếu bật "Tự rà lỗi chữ", máy nghe lại, sai thì đọc lại (tối đa 2 lần, seed khác) và giữ bản ít lỗi nhất
 async function pcLine(vo,g,line,P,note,seed){const st=g.slow?(L.pcSlow||''):(L.pcStyle||'');
  const one=async sd=>{let a=await PC.tts(vo.pc,line,st,sd);if(g.slow&&!L.pcSlow)a=wsola(P.trim?trimSil(a):a,g.slow);return normLevel(a)};
@@ -541,7 +552,7 @@ function renderCmp(){const ok=(c,t)=>`<span style="color:${c?'var(--ok)':'#b26a0
   const d=new Date(),p=n=>String(n).padStart(2,'0');const zb=await zip(fs);await deliver(zb,`so-sanh-giong_${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}.zip`);toast('Đã tạo file zip '+fmtB(zb.size))})}
 $('#cgo').onclick=runCompare;
 
-function renderResult(h,box=$('#res')){const ext=L.fmt==='mp3'?'mp3':'wav';const multi=h.segs.length>1;
+function renderResult(h,box=$('#res')){h.segs.forEach(g=>{if(g.loi&&g.loi.length)g.loi=g.loi.map(x=>({...x,loi:(x.loi||[]).filter(y=>!giongNhau(y))})).filter(x=>x.loi.length)});const ext=L.fmt==='mp3'?'mp3':'wav';const multi=h.segs.length>1;
  let s=`<div class="card"><h3 data-ic="✅" style="cursor:default">Kết quả${h.partial?' (chưa đủ)':''}</h3><div class="fb"><div class="muted small">${esc(h.voice)} · ${nf(h.speed,2)}× · ${h.segs.length} đoạn · tổng ${fmtT(h.dur)}</div><div class="list">`;
  h.segs.forEach((g,k)=>{s+=`<div class="it"><div class="tx"><div><b>${String(g.i).padStart(2,'0')}</b> ${esc(g.text)}</div><div class="muted small">${fmtT(g.dur)} · ${fname(g.i)}.${ext}${g.slow?(String(h.voiceKey).startsWith('pc:')?' · đoạn chậm (nghỉ dài hơn)':' · chậm ×'+nf(g.slow,2)):''}</div>${(g.loi&&g.loi.length)?`<div class="small" style="color:var(--bad)">⚠ Máy nghe chưa khớp: ${esc(g.loi.map(x=>x.loi.join(', ')).join(' | '))}. Nghe lại; sai thì bấm ↻</div>`:''}</div>${String(h.voiceKey).startsWith('pc:')?`<button class="ic" data-rg="${k}" title="Đọc lại đoạn này">↻</button>`:''}<button class="ic" data-pl="${k}">▶</button><button class="ic" data-dl="${k}">⬇</button></div>`});
  s+='</div><div class="row" style="margin-top:8px">';
@@ -549,7 +560,10 @@ function renderResult(h,box=$('#res')){const ext=L.fmt==='mp3'?'mp3':'wav';const
  if((L.mode!=='each'||!multi)&&h.merged)s+=`<button class="pri" data-m="1">⬇ File gộp (${fmtT(h.dur)})</button>`;
  if(h.merged&&L.mode==='each')s+=`<button data-mp="1">▶ Nghe cả bài</button>`;
  if(h.merged&&L.mode!=='each')s+=`<button data-mp="1">▶ Nghe</button>`;
+ const nLoi=h.segs.filter(g=>g.loi&&g.loi.length).length;if(nLoi){s+=`<button data-txt="1">📄 Xuất ${nLoi} câu lỗi (.txt)</button>`;if(String(h.voiceKey).startsWith('pc:'))s+=`<button data-rgall="1">↻ Đọc lại ${nLoi} câu lỗi</button>`}
  s+='</div></div></div>';box.innerHTML=s;
+ box.querySelectorAll('[data-txt]').forEach(b=>b.onclick=()=>{const ext=L.fmt==='mp3'?'mp3':'wav';const t=h.segs.filter(g=>g.loi&&g.loi.length).map(g=>`${g.i}\t${fname(g.i)}.${ext}\t${g.text}\t[máy nghe: ${g.loi.map(x=>x.loi.join(', ')).join(' | ')}]`).join('\n');deliver(new Blob(['\ufeff'+t],{type:'text/plain'}),'cau-loi.txt')});
+ box.querySelectorAll('[data-rgall]').forEach(b=>b.onclick=async()=>{const ks=h.segs.map((g,k)=>g.loi&&g.loi.length?k:-1).filter(k=>k>=0);b.disabled=true;for(let n=0;n<ks.length;n++){b.textContent=`Đang đọc lại ${n+1}/${ks.length}…`;const bt=box.querySelector(`[data-rg="${ks[n]}"]`)||document.createElement('button');await redoSeg(h,ks[n],bt,box)}const con=h.segs.filter(g=>g.loi&&g.loi.length).length;toast(con?`Còn ${con} câu máy vẫn nghe chưa khớp — bấm 📄 Xuất để gửi`:'Đã sửa xong tất cả câu lỗi',4000)});
  box.querySelectorAll('[data-pl]').forEach(b=>b.onclick=()=>play(h.segs[+b.dataset.pl].blob,b));
  box.querySelectorAll('[data-rg]').forEach(b=>b.onclick=()=>redoSeg(h,+b.dataset.rg,b,box));
  box.querySelectorAll('[data-dl]').forEach(b=>b.onclick=()=>exportOne(h,+b.dataset.dl));
@@ -597,7 +611,7 @@ const PC={st:null,
   try{const r=await fetch(this.url()+'/status',{cache:'no-store',signal:c.signal});const j=await r.json();if(!j||j.app!=='fox-voice-pc')throw new Error('Địa chỉ này không phải máy chủ Fox-voice PC');this.st=j;return j}
   catch(e){this.st=null;throw new Error(e.name==='AbortError'?'Không phản hồi (quá thời gian chờ)':e.message)}finally{clearTimeout(t)}},
  async kiemtra(f,text){let r;try{r=await fetch(this.url()+'/kiemtra?sr='+SR+'&text='+encodeURIComponent(text),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:f})}catch(e){return null}
-  if(!r.ok)return null;try{return await r.json()}catch(e){return null}},
+  if(!r.ok)return null;let k;try{k=await r.json()}catch(e){return null}if(k&&Array.isArray(k.loi)){k.loi=k.loi.filter(x=>!giongNhau(x));if(!k.loi.length)k.dung=true}return k},
  async hauky(f){let r;try{r=await fetch(this.url()+'/hauky?sr='+SR+'&hoso=E',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:f})}catch(e){throw new Error('Không kết nối được máy chủ PC')}
   if(r.status===404)throw new Error('Máy chủ PC cần bản 1.9 trở lên để hậu kỳ');if(!r.ok){let m='HTTP '+r.status;try{m=(await r.json()).error||m}catch(e){}throw new Error(m)}
   return toSR(new Float32Array(await r.arrayBuffer()),+r.headers.get('X-Sample-Rate')||SR)},
